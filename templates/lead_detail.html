@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+{% block title %}{{ contact.first_name }} {{ contact.last_name or '' }}{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <a href="/leads" class="text-sm text-gray-500 hover:text-gray-700">&larr; Back to Leads</a>
+    <h2 class="text-2xl font-bold text-gray-900 mt-2">{{ contact.first_name }} {{ contact.last_name or '' }}</h2>
+    <p class="text-sm text-gray-500">{{ contact.job_title or '' }}{% if contact.company %} at {{ contact.company.company_name }}{% endif %}</p>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Contact Info -->
+    <div class="lg:col-span-2 space-y-6">
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Contact Information</h3>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="text-xs font-medium text-gray-500">Full Name</label>
+                    <p class="text-sm text-gray-900">{{ contact.first_name }} {{ contact.last_name or '' }}</p>
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500">Job Title</label>
+                    <p class="text-sm text-gray-900">{{ contact.job_title or '-' }}</p>
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500">Seniority</label>
+                    <p class="text-sm text-gray-900">{{ contact.seniority_level or '-' }}</p>
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500">Work Email</label>
+                    <p class="text-sm text-gray-900">{{ contact.email_work or '-' }}</p>
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500">Phone (Work)</label>
+                    <p class="text-sm text-gray-900">{{ contact.phone_work or '-' }}</p>
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500">Phone (Mobile)</label>
+                    <p class="text-sm text-gray-900">{{ contact.phone_mobile or '-' }}</p>
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500">Location</label>
+                    <p class="text-sm text-gray-900">{{ contact.location_city or '' }}{% if contact.location_state %}, {{ contact.location_state }}{% endif %} {{ contact.location_country or '' }}</p>
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500">LinkedIn</label>
+                    {% if contact.linkedin_url %}
+                    <a href="{{ contact.linkedin_url }}" target="_blank" class="text-sm text-blue-600 hover:underline">View Profile</a>
+                    {% else %}
+                    <p class="text-sm text-gray-400">-</p>
+                    {% endif %}
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500">Lead Source</label>
+                    <p class="text-sm text-gray-900">{{ contact.lead_source or '-' }}</p>
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500">Years in Role</label>
+                    <p class="text-sm text-gray-900">{{ contact.years_in_role or '-' }}</p>
+                </div>
+            </div>
+            {% if contact.profile_summary %}
+            <div class="mt-4">
+                <label class="text-xs font-medium text-gray-500">Profile Summary</label>
+                <p class="text-sm text-gray-700 mt-1">{{ contact.profile_summary }}</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Company Info -->
+        {% if contact.company %}
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Company: {{ contact.company.company_name }}</h3>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="text-xs font-medium text-gray-500">Industry</label>
+                    <p class="text-sm text-gray-900">{{ contact.company.company_industry or '-' }}</p>
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500">Website</label>
+                    <p class="text-sm text-gray-900">{{ contact.company.company_website or '-' }}</p>
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500">Size</label>
+                    <p class="text-sm text-gray-900">{{ contact.company.company_size or '-' }} employees</p>
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500">Revenue</label>
+                    <p class="text-sm text-gray-900">{{ contact.company.company_revenue or '-' }}</p>
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500">Location</label>
+                    <p class="text-sm text-gray-900">{{ contact.company.company_location or '-' }}</p>
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500">ABN</label>
+                    <p class="text-sm text-gray-900">{{ contact.company.abn or '-' }}</p>
+                </div>
+            </div>
+            {% if contact.company.company_keywords %}
+            <div class="mt-4">
+                <label class="text-xs font-medium text-gray-500">Keywords</label>
+                <div class="flex flex-wrap gap-1 mt-1">
+                    {% for kw in contact.company.company_keywords.split(',') %}
+                    <span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">{{ kw.strip() }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Activity Timeline -->
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Activity</h3>
+
+            {% if meetings %}
+            <h4 class="text-sm font-medium text-gray-700 mb-2">Meetings</h4>
+            <div class="space-y-2 mb-4">
+                {% for meeting in meetings %}
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">{{ meeting.title }}</p>
+                        <p class="text-xs text-gray-500">{{ meeting.meeting_time.strftime('%d %b %Y %H:%M') }} - {{ meeting.status }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if proposals %}
+            <h4 class="text-sm font-medium text-gray-700 mb-2">Proposals</h4>
+            <div class="space-y-2 mb-4">
+                {% for proposal in proposals %}
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">${{ "{:,.0f}".format(proposal.pricing) }} - {{ proposal.status }}</p>
+                        <p class="text-xs text-gray-500">Created {{ proposal.created_at.strftime('%d %b %Y') }}</p>
+                    </div>
+                    {% if proposal.pdf_path %}
+                    <a href="/proposals/{{ proposal.id }}/pdf" class="text-xs text-blue-600 hover:underline">Download PDF</a>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if enrollments %}
+            <h4 class="text-sm font-medium text-gray-700 mb-2">Nurture Sequences</h4>
+            <div class="space-y-2">
+                {% for enrollment in enrollments %}
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">{{ enrollment.sequence.name }}</p>
+                        <p class="text-xs text-gray-500">Step {{ enrollment.current_step + 1 }}/{{ enrollment.sequence.steps | length }} - {{ enrollment.status }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if not meetings and not proposals and not enrollments %}
+            <p class="text-sm text-gray-400">No activity yet</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Sidebar Actions -->
+    <div class="space-y-6">
+        <!-- Status & Deal -->
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Lead Status</h3>
+            <form action="/leads/{{ contact.id }}/update" method="post" class="space-y-4">
+                <div>
+                    <label class="text-xs font-medium text-gray-500">Status</label>
+                    <select name="lead_status" class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        {% for s in ["New", "Contacted", "Qualified", "Proposal", "Negotiation", "Won", "Lost"] %}
+                        <option value="{{ s }}" {% if contact.lead_status == s %}selected{% endif %}>{{ s }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500">Lead Score (1-100)</label>
+                    <input type="number" name="lead_score" value="{{ contact.lead_score or '' }}" min="1" max="100"
+                           class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500">Deal Value ($)</label>
+                    <input type="number" name="deal_value" value="{{ contact.deal_value or '' }}" step="100"
+                           class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500">Assigned To</label>
+                    <input type="text" name="assigned_to" value="{{ contact.assigned_to or '' }}"
+                           class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500">Notes</label>
+                    <textarea name="notes" rows="3" class="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm">{{ contact.notes or '' }}</textarea>
+                </div>
+                <button type="submit" class="w-full px-4 py-2 bg-navy text-white rounded-lg text-sm font-medium hover:bg-navy-light transition-colors">
+                    Update Lead
+                </button>
+            </form>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+            <div class="space-y-2">
+                <a href="/proposals?contact_id={{ contact.id }}" class="block w-full px-4 py-2 bg-green-50 text-green-700 rounded-lg text-sm font-medium hover:bg-green-100 text-center transition-colors">
+                    Create Proposal
+                </a>
+                <a href="/scheduler?contact_id={{ contact.id }}" class="block w-full px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100 text-center transition-colors">
+                    Schedule Meeting
+                </a>
+                {% if sequences %}
+                <form action="/nurture/enroll" method="post" class="flex gap-2">
+                    <input type="hidden" name="contact_id" value="{{ contact.id }}">
+                    <select name="sequence_id" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        {% for seq in sequences %}
+                        <option value="{{ seq.id }}">{{ seq.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="px-3 py-2 bg-purple-50 text-purple-700 rounded-lg text-sm font-medium hover:bg-purple-100 transition-colors">Enroll</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

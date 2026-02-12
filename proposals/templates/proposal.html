@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        @page { size: A4; margin: 2cm; }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #333; line-height: 1.6; }
+        .header { background-color: #1e3a5f; color: white; padding: 30px; margin: -2cm -2cm 30px -2cm; }
+        .header h1 { margin: 0; font-size: 28px; letter-spacing: 1px; }
+        .header p { margin: 5px 0 0; font-size: 14px; opacity: 0.8; }
+        .proposal-meta { display: flex; justify-content: space-between; margin-bottom: 30px; }
+        .meta-box { background: #f8f9fa; padding: 15px; border-radius: 8px; width: 48%; }
+        .meta-box label { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
+        .meta-box p { font-size: 14px; margin: 4px 0 0; font-weight: 600; }
+        h2 { color: #1e3a5f; border-bottom: 2px solid #f39c12; padding-bottom: 8px; margin-top: 30px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th { background-color: #1e3a5f; color: white; padding: 10px 15px; text-align: left; font-size: 13px; }
+        td { padding: 10px 15px; border-bottom: 1px solid #eee; font-size: 13px; }
+        tr:nth-child(even) { background-color: #f8f9fa; }
+        .total-row { background-color: #1e3a5f !important; color: white; font-weight: bold; }
+        .total-row td { border: none; font-size: 15px; }
+        .differentiators { margin-top: 30px; }
+        .differentiators ul { list-style: none; padding: 0; }
+        .differentiators li { padding: 6px 0 6px 25px; position: relative; font-size: 13px; }
+        .differentiators li::before { content: "✓"; position: absolute; left: 0; color: #27ae60; font-weight: bold; }
+        .notes { background: #fff8e1; border-left: 4px solid #f39c12; padding: 15px; margin-top: 20px; font-size: 13px; }
+        .footer { margin-top: 40px; padding-top: 20px; border-top: 2px solid #1e3a5f; font-size: 11px; color: #666; }
+        .footer .contact { font-weight: 600; color: #1e3a5f; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{{ company }}</h1>
+        <p>{{ website }}</p>
+    </div>
+
+    <h1 style="color: #1e3a5f; text-align: center; font-size: 24px; margin-bottom: 5px;">PROPOSAL</h1>
+    <p style="text-align: center; color: #666; font-size: 13px;">{{ proposal_number }} | {{ date }}</p>
+
+    <div class="proposal-meta">
+        <div class="meta-box">
+            <label>Prepared For</label>
+            <p>{{ contact_name }}</p>
+            <p style="font-weight: normal; color: #666;">{{ company_name }}</p>
+        </div>
+        <div class="meta-box">
+            <label>Prepared By</label>
+            <p>{{ company }}</p>
+            <p style="font-weight: normal; color: #666;">{{ website }}</p>
+        </div>
+    </div>
+
+    <h2>Products & Services</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Item</th>
+                <th>Description</th>
+                <th style="text-align: center;">Qty</th>
+                <th style="text-align: right;">Unit Price</th>
+                <th style="text-align: right;">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for product in products %}
+            <tr>
+                <td><strong>{{ product.name }}</strong></td>
+                <td>{{ product.description }}</td>
+                <td style="text-align: center;">{{ product.quantity }}</td>
+                <td style="text-align: right;">${{ "{:,.2f}".format(product.unit_price) }}</td>
+                <td style="text-align: right;">${{ "{:,.2f}".format(product.total) }}</td>
+            </tr>
+            {% endfor %}
+            <tr class="total-row">
+                <td colspan="4" style="text-align: right;">TOTAL</td>
+                <td style="text-align: right;">${{ "{:,.2f}".format(total_price) }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    {% if notes %}
+    <div class="notes">
+        <strong>Notes:</strong> {{ notes }}
+    </div>
+    {% endif %}
+
+    <div class="differentiators">
+        <h2>Why Choose {{ company }}?</h2>
+        <ul>
+            {% for diff in differentiators %}
+            <li>{{ diff }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <div class="footer">
+        <p class="contact">{{ company }} | {{ website }}</p>
+        <p>This proposal is valid for 30 days from the date of issue. All prices are in AUD and exclusive of GST unless otherwise stated. Terms: Net 30 days from invoice date.</p>
+    </div>
+</body>
+</html>

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; line-height: 1.6; }
+        .email-header { background-color: #1e3a5f; color: white; padding: 20px 30px; text-align: center; }
+        .email-header h1 { margin: 0; font-size: 20px; }
+        .email-header p { margin: 5px 0 0; font-size: 12px; opacity: 0.8; }
+        .email-body { padding: 30px; }
+        .greeting { font-size: 16px; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th { background-color: #1e3a5f; color: white; padding: 8px 12px; text-align: left; font-size: 12px; }
+        td { padding: 8px 12px; border-bottom: 1px solid #eee; font-size: 13px; }
+        .total { background: #f8f9fa; font-weight: bold; font-size: 16px; }
+        .cta { display: inline-block; background-color: #f39c12; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 20px 0; }
+        .benefits { list-style: none; padding: 0; }
+        .benefits li { padding: 4px 0 4px 20px; position: relative; font-size: 13px; }
+        .benefits li::before { content: "•"; position: absolute; left: 0; color: #f39c12; font-weight: bold; }
+        .signature { margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 13px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="email-header">
+        <h1>{{ company }}</h1>
+        <p>Anti-Corrosion Steel Protection</p>
+    </div>
+
+    <div class="email-body">
+        <p class="greeting">Hi {{ contact_name }},</p>
+
+        <p>Thank you for your interest in our steel protection solutions. Based on our discussion about {{ company_name }}'s requirements, I'm pleased to present the following proposal:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Product/Service</th>
+                    <th style="text-align: center;">Qty</th>
+                    <th style="text-align: right;">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for product in products %}
+                <tr>
+                    <td><strong>{{ product.name }}</strong><br><small style="color:#666">{{ product.description }}</small></td>
+                    <td style="text-align: center;">{{ product.quantity }}</td>
+                    <td style="text-align: right;">${{ "{:,.2f}".format(product.total) }}</td>
+                </tr>
+                {% endfor %}
+                <tr class="total">
+                    <td colspan="2">Total Investment</td>
+                    <td style="text-align: right;">${{ "{:,.2f}".format(total_price) }}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        {% if notes %}
+        <p><strong>Notes:</strong> {{ notes }}</p>
+        {% endif %}
+
+        <p>Key benefits of our system:</p>
+        <ul class="benefits">
+            {% for diff in differentiators[:5] %}
+            <li>{{ diff }}</li>
+            {% endfor %}
+        </ul>
+
+        <p style="text-align: center;">
+            <a href="#" class="cta">Schedule a Call to Discuss</a>
+        </p>
+
+        <div class="signature">
+            <p><strong>Corrizon Team</strong></p>
+            <p>{{ company }}<br>{{ website }}</p>
+        </div>
+    </div>
+</body>
+</html>

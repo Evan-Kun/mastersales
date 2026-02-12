@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Leads{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h2 class="text-2xl font-bold text-gray-900">Leads</h2>
+        <p class="text-sm text-gray-500 mt-1">{{ contacts | length }} contacts in database</p>
+    </div>
+    <a href="/scraper" class="px-4 py-2 bg-navy text-white rounded-lg text-sm font-medium hover:bg-navy-light transition-colors">
+        + Source New Leads
+    </a>
+</div>
+
+<!-- Filters -->
+<div class="bg-white rounded-xl shadow-sm p-4 mb-6 border border-gray-100">
+    <form class="flex flex-wrap gap-4 items-end" action="/leads" method="get">
+        <div class="flex-1 min-w-[200px]">
+            <label class="block text-xs font-medium text-gray-500 mb-1">Search</label>
+            <input type="text" name="q" value="{{ q }}" placeholder="Name, company, title, email..."
+                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy focus:border-navy"
+                   hx-get="/leads" hx-trigger="keyup changed delay:300ms" hx-target="#leads-table-body" hx-include="[name='status'],[name='state']">
+        </div>
+        <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Status</label>
+            <select name="status" class="px-3 py-2 border border-gray-300 rounded-lg text-sm" onchange="this.form.submit()">
+                <option value="">All Statuses</option>
+                {% for s in statuses %}
+                <option value="{{ s }}" {% if current_status == s %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">State</label>
+            <select name="state" class="px-3 py-2 border border-gray-300 rounded-lg text-sm" onchange="this.form.submit()">
+                <option value="">All States</option>
+                {% for st in states %}
+                <option value="{{ st }}" {% if current_state == st %}selected{% endif %}>{{ st }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200">Filter</button>
+    </form>
+</div>
+
+<!-- Leads Table -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <table class="w-full">
+        <thead class="bg-gray-50 border-b border-gray-200">
+            <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deal Value</th>
+            </tr>
+        </thead>
+        <tbody id="leads-table-body" class="divide-y divide-gray-100">
+            {% for contact in contacts %}
+            <tr class="hover:bg-gray-50 cursor-pointer transition-colors" onclick="window.location='/leads/{{ contact.id }}'">
+                <td class="px-4 py-3">
+                    <div class="text-sm font-medium text-gray-900">{{ contact.first_name }} {{ contact.last_name or '' }}</div>
+                    <div class="text-xs text-gray-400">{{ contact.seniority_level or '' }}</div>
+                </td>
+                <td class="px-4 py-3 text-sm text-gray-600">{{ contact.company.company_name if contact.company else '-' }}</td>
+                <td class="px-4 py-3 text-sm text-gray-600">{{ contact.job_title or '-' }}</td>
+                <td class="px-4 py-3 text-sm text-gray-600">{{ contact.location_city or '' }}{% if contact.location_state %}, {{ contact.location_state }}{% endif %}</td>
+                <td class="px-4 py-3 text-sm text-gray-600">{{ contact.email_work or '-' }}</td>
+                <td class="px-4 py-3">
+                    {% set badge_colors = {"New": "bg-blue-100 text-blue-800", "Contacted": "bg-purple-100 text-purple-800", "Qualified": "bg-yellow-100 text-yellow-800", "Proposal": "bg-orange-100 text-orange-800", "Negotiation": "bg-pink-100 text-pink-800", "Won": "bg-green-100 text-green-800", "Lost": "bg-red-100 text-red-800"} %}
+                    <span class="badge {{ badge_colors.get(contact.lead_status, 'bg-gray-100 text-gray-800') }}">{{ contact.lead_status }}</span>
+                </td>
+                <td class="px-4 py-3 text-sm text-gray-600">{% if contact.deal_value %}${{ "{:,.0f}".format(contact.deal_value) }}{% else %}-{% endif %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% if not contacts %}
+    <div class="text-center py-12 text-gray-400">
+        <p class="text-lg">No leads found</p>
+        <p class="text-sm mt-1">Try adjusting your filters or <a href="/scraper" class="text-blue-600 hover:underline">source new leads</a></p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

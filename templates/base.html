@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}MasterSales{% endblock %} - {{ settings.company_name }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        navy: { DEFAULT: '#1e3a5f', light: '#2a4d7a', dark: '#152d4a' },
+                        amber: { DEFAULT: '#f39c12', light: '#f5b041' },
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="h-full" x-data>
+    <div class="flex h-screen overflow-hidden">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-navy text-white flex flex-col flex-shrink-0">
+            <!-- Logo -->
+            <div class="p-5 border-b border-navy-light">
+                <h1 class="text-xl font-bold tracking-tight">MasterSales</h1>
+                <p class="text-xs text-gray-300 mt-1">{{ settings.company_name }}</p>
+            </div>
+
+            <!-- Navigation -->
+            <nav class="flex-1 py-4 space-y-1 px-3">
+                <a href="/" class="nav-link flex items-center px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-navy-light transition-colors {% if request.url.path == '/' %}active bg-navy-light{% endif %}">
+                    <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                    Dashboard
+                </a>
+                <a href="/scraper" class="nav-link flex items-center px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-navy-light transition-colors {% if '/scraper' in request.url.path %}active bg-navy-light{% endif %}">
+                    <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    Lead Sourcing
+                </a>
+                <a href="/leads" class="nav-link flex items-center px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-navy-light transition-colors {% if '/leads' in request.url.path %}active bg-navy-light{% endif %}">
+                    <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                    Leads
+                </a>
+                <a href="/pipeline" class="nav-link flex items-center px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-navy-light transition-colors {% if '/pipeline' in request.url.path %}active bg-navy-light{% endif %}">
+                    <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                    Pipeline
+                </a>
+                <a href="/scheduler" class="nav-link flex items-center px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-navy-light transition-colors {% if '/scheduler' in request.url.path %}active bg-navy-light{% endif %}">
+                    <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    Meetings
+                </a>
+                <a href="/nurture" class="nav-link flex items-center px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-navy-light transition-colors {% if '/nurture' in request.url.path %}active bg-navy-light{% endif %}">
+                    <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    Nurture
+                </a>
+                <a href="/proposals" class="nav-link flex items-center px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-navy-light transition-colors {% if '/proposals' in request.url.path %}active bg-navy-light{% endif %}">
+                    <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    Proposals
+                </a>
+            </nav>
+
+            <!-- Footer -->
+            <div class="p-4 border-t border-navy-light text-xs text-gray-400">
+                <p>{{ settings.company_website }}</p>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 overflow-y-auto">
+            <div class="p-6">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

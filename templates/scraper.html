@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Lead Sourcing{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <h2 class="text-2xl font-bold text-gray-900">Lead Sourcing</h2>
+    <p class="text-sm text-gray-500 mt-1">Search LinkedIn for prospects matching your ICP</p>
+</div>
+
+<!-- Search Form -->
+<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-6">
+    <h3 class="text-lg font-semibold text-gray-900 mb-4">ICP Search Parameters</h3>
+    <form hx-post="/scraper/start" hx-target="#scraper-results" hx-swap="innerHTML" class="space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="md:col-span-2">
+                <label class="block text-xs font-medium text-gray-500 mb-1">Industry Keywords (comma-separated)</label>
+                <input type="text" name="keywords" value="{{ settings.industry_keywords[:8] | join(', ') }}"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy focus:border-navy"
+                       placeholder="steel, corrosion, fabrication...">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-500 mb-1">Location</label>
+                <select name="location" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    <option value="Australia">Australia</option>
+                    <option value="Western Australia, Australia">Western Australia</option>
+                    <option value="Victoria, Australia">Victoria</option>
+                    <option value="New Zealand">New Zealand</option>
+                </select>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label class="block text-xs font-medium text-gray-500 mb-1">Max Results</label>
+                <input type="number" name="max_results" value="20" min="5" max="100"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+            </div>
+        </div>
+
+        <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
+            <p class="text-xs text-amber-800"><strong>Note:</strong> LinkedIn scraping requires valid credentials in your .env file (LINKEDIN_EMAIL and LINKEDIN_PASSWORD). Rate limiting is applied automatically.</p>
+        </div>
+
+        <button type="submit" class="px-6 py-2.5 bg-navy text-white rounded-lg text-sm font-medium hover:bg-navy-light transition-colors">
+            Start Scraping
+        </button>
+    </form>
+</div>
+
+<!-- Results -->
+<div id="scraper-results">
+    {% include "partials/scraper_status.html" %}
+</div>
+{% endblock %}

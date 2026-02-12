@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Pipeline{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <h2 class="text-2xl font-bold text-gray-900">Pipeline Board</h2>
+    <p class="text-sm text-gray-500 mt-1">Drag and drop deals between stages</p>
+</div>
+
+<!-- Stats Bar -->
+<div id="pipeline-stats" class="flex gap-3 mb-6 overflow-x-auto pb-2">
+    {% include "partials/pipeline_stats.html" %}
+</div>
+
+<!-- Kanban Board -->
+<div class="flex gap-4 overflow-x-auto pb-4" style="min-height: 500px;">
+    {% set stage_colors = {"New": "blue", "Contacted": "purple", "Qualified": "yellow", "Proposal": "orange", "Negotiation": "pink", "Won": "green", "Lost": "red"} %}
+
+    {% for stage in stages %}
+    <div class="kanban-column flex-shrink-0 w-64 bg-gray-50 rounded-xl p-3" data-status="{{ stage }}">
+        <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-semibold text-gray-700">{{ stage }}</h3>
+            <span class="text-xs bg-{{ stage_colors[stage] }}-100 text-{{ stage_colors[stage] }}-700 px-2 py-0.5 rounded-full font-medium">
+                {{ pipeline_data[stage] | length }}
+            </span>
+        </div>
+
+        <div class="kanban-cards space-y-2 min-h-[200px]">
+            {% for contact in pipeline_data[stage] %}
+            <div class="kanban-card bg-white rounded-lg p-3 shadow-sm border border-gray-100" data-contact-id="{{ contact.id }}">
+                <p class="text-sm font-medium text-gray-900">{{ contact.first_name }} {{ contact.last_name or '' }}</p>
+                <p class="text-xs text-gray-500">{{ contact.company.company_name if contact.company else '' }}</p>
+                {% if contact.deal_value %}
+                <p class="text-sm font-semibold text-green-600 mt-1">${{ "{:,.0f}".format(contact.deal_value) }}</p>
+                {% endif %}
+                <div class="flex items-center justify-between mt-2">
+                    <span class="text-xs text-gray-400">{{ contact.location_state or '' }}</span>
+                    <a href="/leads/{{ contact.id }}" class="text-xs text-blue-600 hover:underline" onclick="event.stopPropagation()">View</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.kanban-cards').forEach(function(el) {
+        new Sortable(el, {
+            group: 'pipeline',
+            animation: 150,
+            ghostClass: 'opacity-50',
+            onEnd: function(evt) {
+                var contactId = evt.item.dataset.contactId;
+                var newStatus = evt.to.closest('.kanban-column').dataset.status;
+                htmx.ajax('POST', '/pipeline/move', {
+                    values: { contact_id: contactId, new_status: newStatus },
+                    target: '#pipeline-stats',
+                    swap: 'innerHTML'
+                });
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

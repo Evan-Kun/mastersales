@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Meetings{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h2 class="text-2xl font-bold text-gray-900">Meeting Scheduler</h2>
+        <p class="text-sm text-gray-500 mt-1">Schedule and track meetings with leads</p>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- New Meeting Form -->
+    <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Schedule New Meeting</h3>
+        <form action="/scheduler/create" method="post" class="space-y-4">
+            <div>
+                <label class="block text-xs font-medium text-gray-500 mb-1">Contact</label>
+                <select name="contact_id" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    {% for contact in contacts %}
+                    <option value="{{ contact.id }}">{{ contact.first_name }} {{ contact.last_name or '' }} - {{ contact.company.company_name if contact.company else 'No company' }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-500 mb-1">Title</label>
+                <input type="text" name="title" required placeholder="e.g., Product Demo, Intro Call"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Date</label>
+                    <input type="date" name="meeting_date" required
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Time</label>
+                    <input type="time" name="meeting_time_str" required value="10:00"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-500 mb-1">Duration (minutes)</label>
+                <select name="duration_minutes" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    <option value="15">15 min</option>
+                    <option value="30" selected>30 min</option>
+                    <option value="45">45 min</option>
+                    <option value="60">60 min</option>
+                    <option value="90">90 min</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-500 mb-1">Location / Video Link</label>
+                <input type="text" name="location" placeholder="Office, Zoom link, etc."
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-500 mb-1">Agenda</label>
+                <textarea name="agenda" rows="3" placeholder="Meeting agenda..."
+                          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></textarea>
+            </div>
+            <button type="submit" class="w-full px-4 py-2 bg-navy text-white rounded-lg text-sm font-medium hover:bg-navy-light transition-colors">
+                Schedule Meeting
+            </button>
+        </form>
+    </div>
+
+    <!-- Upcoming & Past Meetings -->
+    <div class="lg:col-span-2 space-y-6">
+        <!-- Upcoming -->
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Upcoming Meetings</h3>
+            {% if upcoming %}
+            <div class="space-y-3">
+                {% for meeting in upcoming %}
+                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                    <div class="flex items-center gap-4">
+                        <div class="text-center bg-navy text-white rounded-lg p-2 min-w-[60px]">
+                            <p class="text-xs font-medium">{{ meeting.meeting_time.strftime('%b') }}</p>
+                            <p class="text-xl font-bold">{{ meeting.meeting_time.strftime('%d') }}</p>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">{{ meeting.title }}</p>
+                            <p class="text-xs text-gray-500">
+                                {{ meeting.contact.first_name }} {{ meeting.contact.last_name or '' }}
+                                {% if meeting.contact.company %} - {{ meeting.contact.company.company_name }}{% endif %}
+                            </p>
+                            <p class="text-xs text-gray-400">
+                                {{ meeting.meeting_time.strftime('%H:%M') }} ({{ meeting.duration_minutes }}min)
+                                {% if meeting.location %} | {{ meeting.location }}{% endif %}
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <form action="/scheduler/{{ meeting.id }}/complete" method="post">
+                            <button class="px-3 py-1 bg-green-100 text-green-700 rounded text-xs font-medium hover:bg-green-200">Done</button>
+                        </form>
+                        <form action="/scheduler/{{ meeting.id }}/cancel" method="post">
+                            <button class="px-3 py-1 bg-red-100 text-red-700 rounded text-xs font-medium hover:bg-red-200">Cancel</button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-sm text-gray-400">No upcoming meetings. Schedule one!</p>
+            {% endif %}
+        </div>
+
+        <!-- Past -->
+        {% if past %}
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Past Meetings</h3>
+            <div class="space-y-2">
+                {% for meeting in past %}
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg opacity-75">
+                    <div>
+                        <p class="text-sm text-gray-700">{{ meeting.title }}</p>
+                        <p class="text-xs text-gray-400">
+                            {{ meeting.meeting_time.strftime('%d %b %Y %H:%M') }} |
+                            {{ meeting.contact.first_name }} {{ meeting.contact.last_name or '' }} |
+                            <span class="{% if meeting.status == 'Completed' %}text-green-600{% elif meeting.status == 'Cancelled' %}text-red-600{% endif %}">{{ meeting.status }}</span>
+                        </p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

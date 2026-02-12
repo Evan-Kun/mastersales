@@ -1,0 +1,19 @@
+<div class="space-y-3">
+    <div class="flex items-center justify-between">
+        <span class="text-xs font-medium text-gray-400">Step {{ step_number }}/{{ total_steps }}</span>
+        <span class="text-xs px-2 py-0.5 rounded-full {% if enrollment.status == 'Active' %}bg-green-100 text-green-700{% else %}bg-gray-100 text-gray-600{% endif %}">
+            {{ enrollment.status }}
+        </span>
+    </div>
+    <div>
+        <label class="text-xs font-medium text-gray-500">Subject</label>
+        <p class="text-sm font-medium text-gray-900 mt-0.5">{{ step.subject }}</p>
+    </div>
+    <div>
+        <label class="text-xs font-medium text-gray-500">Body</label>
+        <div class="mt-1 bg-gray-50 rounded-lg p-3 text-sm text-gray-700 whitespace-pre-wrap">{{ body }}</div>
+    </div>
+    <div class="text-xs text-gray-400">
+        Day offset: {{ step.day_offset }} days after enrollment
+    </div>
+</div>

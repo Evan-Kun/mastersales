@@ -1,0 +1,12 @@
+{% set stage_colors = {"New": "blue", "Contacted": "purple", "Qualified": "yellow", "Proposal": "orange", "Negotiation": "pink", "Won": "green", "Lost": "red"} %}
+{% for stage in stages %}
+<div class="flex-shrink-0 bg-white rounded-lg px-4 py-2 border border-gray-100 shadow-sm">
+    <span class="text-xs text-gray-500">{{ stage }}</span>
+    <div class="flex items-center gap-2">
+        <span class="text-lg font-bold text-gray-900">{{ pipeline_stats[stage].count }}</span>
+        {% if pipeline_stats[stage].total_value > 0 %}
+        <span class="text-xs text-green-600">${{ "{:,.0f}".format(pipeline_stats[stage].total_value) }}</span>
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
