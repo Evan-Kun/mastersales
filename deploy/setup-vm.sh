@@ -36,7 +36,7 @@ fi
 # --- Python environment ---
 echo "[3/6] Setting up Python environment..."
 python3 -m venv venv
-source venv/bin/activate
+. venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
 
