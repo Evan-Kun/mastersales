@@ -1,0 +1,12 @@
+venv/
+__pycache__/
+*.pyc
+.env
+mastersales.db
+output/
+.pytest_cache/
+*.egg-info/
+.vercel/
+.git/
+docs/
+tests/

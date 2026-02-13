@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: mastersales
+    runtime: docker
+    repo: https://github.com/Evan-Kun/mastersales.git
+    branch: master
+    plan: free
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: DATABASE_URL
+        value: sqlite:////app/data/mastersales.db
+    disk:
+      name: mastersales-data
+      mountPath: /app/data
+      sizeGB: 1
