@@ -31,7 +31,7 @@ def generate_pdf_proposal(
         differentiators=settings.key_differentiators,
     )
 
-    output_dir = "output/proposals"
+    output_dir = os.path.join("/tmp" if os.environ.get("VERCEL") else ".", "output/proposals")
     os.makedirs(output_dir, exist_ok=True)
     pdf_path = os.path.join(output_dir, f"{proposal_number}.pdf")
 
