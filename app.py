@@ -12,7 +12,7 @@ from sqlalchemy import or_
 from config import settings
 from database.db import init_db, get_db, SessionLocal
 from database.models import (
-    AppSetting, Company, Contact, Meeting, Proposal, NurtureSequence, NurtureEnrollment,
+    Company, Contact, Meeting, Proposal, NurtureSequence, NurtureEnrollment,
 )
 from database.seed import seed_demo_data
 
@@ -260,39 +260,13 @@ scraper_status: dict = {"running": False, "found": 0, "message": "Idle"}
 
 
 @app.get("/scraper", response_class=HTMLResponse)
-def scraper_page(request: Request, db: Session = Depends(get_db)):
-    # Load saved LinkedIn credentials from DB
-    saved_email = db.query(AppSetting).get("linkedin_email")
-    saved_password = db.query(AppSetting).get("linkedin_password")
-
+def scraper_page(request: Request):
     return templates.TemplateResponse("scraper.html", {
         "request": request,
         "settings": settings,
         "scraper_status": scraper_status,
         "results": scraper_results,
-        "saved_linkedin_email": saved_email.value if saved_email else "",
-        "saved_linkedin_password": saved_password.value if saved_password else "",
-        "has_env_credentials": bool(settings.linkedin_email),
     })
-
-
-@app.post("/scraper/save-credentials", response_class=HTMLResponse)
-def scraper_save_credentials(
-    request: Request,
-    linkedin_email: str = Form(""),
-    linkedin_password: str = Form(""),
-    db: Session = Depends(get_db),
-):
-    """Save LinkedIn credentials to the database."""
-    for key, value in [("linkedin_email", linkedin_email), ("linkedin_password", linkedin_password)]:
-        existing = db.query(AppSetting).get(key)
-        if existing:
-            existing.value = value
-        else:
-            db.add(AppSetting(key=key, value=value))
-    db.commit()
-    logger.info(f"WEB: LinkedIn credentials saved ({'set' if linkedin_email else 'cleared'})")
-    return RedirectResponse("/scraper", status_code=303)
 
 
 @app.post("/scraper/start", response_class=HTMLResponse)
@@ -301,7 +275,8 @@ def scraper_start(
     keywords: str = Form(""),
     location: str = Form("Australia"),
     max_results: int = Form(20),
-    db: Session = Depends(get_db),
+    linkedin_email: str = Form(""),
+    linkedin_password: str = Form(""),
 ):
     import threading
     from scraper.search_engine import run_scrape
@@ -313,13 +288,11 @@ def scraper_start(
     if not keyword_list:
         keyword_list = settings.industry_keywords[:5]
 
-    # Load LinkedIn credentials: DB (user-configured) takes priority over .env
-    saved_email = db.query(AppSetting).get("linkedin_email")
-    saved_password = db.query(AppSetting).get("linkedin_password")
-    li_email = (saved_email.value if saved_email else "") or settings.linkedin_email
-    li_password = (saved_password.value if saved_password else "") or settings.linkedin_password
+    # Credentials: form submission (from browser localStorage) > .env fallback
+    li_email = linkedin_email or settings.linkedin_email
+    li_password = linkedin_password or settings.linkedin_password
 
-    cred_source = "web UI" if (saved_email and saved_email.value) else (".env" if settings.linkedin_email else "none")
+    cred_source = "browser" if linkedin_email else (".env" if settings.linkedin_email else "none")
     logger.info(f"WEB: Scrape requested — keywords={keyword_list}, location={location}, max={max_results}, creds={cred_source}")
 
     def _scrape():
