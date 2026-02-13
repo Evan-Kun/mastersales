@@ -1,19 +1,56 @@
 <div class="space-y-3">
+    <!-- Step navigation header -->
     <div class="flex items-center justify-between">
-        <span class="text-xs font-medium text-gray-400">Step {{ step_number }}/{{ total_steps }}</span>
-        <span class="text-xs px-2 py-0.5 rounded-full {% if enrollment.status == 'Active' %}bg-green-100 text-green-700{% else %}bg-gray-100 text-gray-600{% endif %}">
-            {{ enrollment.status }}
-        </span>
+        <div class="flex items-center gap-2">
+            <button hx-get="/nurture/enrollments/{{ enrollment.id }}/preview?step={{ step_index - 1 }}"
+                    hx-target="closest div[id]"
+                    hx-swap="innerHTML"
+                    class="px-2 py-1 rounded text-xs font-medium transition-colors {% if step_index > 0 %}bg-gray-200 text-gray-700 hover:bg-gray-300 cursor-pointer{% else %}bg-gray-100 text-gray-300 cursor-not-allowed{% endif %}"
+                    {% if step_index == 0 %}disabled{% endif %}>
+                &larr; Prev
+            </button>
+            <span class="text-xs font-medium text-gray-500">Step {{ step_number }} of {{ total_steps }}</span>
+            <button hx-get="/nurture/enrollments/{{ enrollment.id }}/preview?step={{ step_index + 1 }}"
+                    hx-target="closest div[id]"
+                    hx-swap="innerHTML"
+                    class="px-2 py-1 rounded text-xs font-medium transition-colors {% if step_index < total_steps - 1 %}bg-gray-200 text-gray-700 hover:bg-gray-300 cursor-pointer{% else %}bg-gray-100 text-gray-300 cursor-not-allowed{% endif %}"
+                    {% if step_index >= total_steps - 1 %}disabled{% endif %}>
+                Next &rarr;
+            </button>
+        </div>
+        <div class="flex items-center gap-2">
+            {% if step_index == current_step and enrollment.status == 'Active' %}
+            <span class="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">Current</span>
+            {% elif step_index < current_step %}
+            <span class="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">Sent</span>
+            {% else %}
+            <span class="text-xs px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full">Upcoming</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Step dots for quick navigation -->
+    <div class="flex items-center gap-1 justify-center">
+        {% for i in range(total_steps) %}
+        <button hx-get="/nurture/enrollments/{{ enrollment.id }}/preview?step={{ i }}"
+                hx-target="closest div[id]"
+                hx-swap="innerHTML"
+                class="w-2.5 h-2.5 rounded-full transition-colors cursor-pointer
+                    {% if i == step_index %}bg-navy ring-2 ring-navy ring-offset-1
+                    {% elif i < current_step %}bg-blue-300
+                    {% elif i == current_step %}bg-green-400
+                    {% else %}bg-gray-300{% endif %}"
+                title="Step {{ i + 1 }}: {{ enrollment.sequence.steps[i].subject }}">
+        </button>
+        {% endfor %}
+    </div>
+
+    <!-- Email content -->
+    <div>
+        <label class="text-xs font-medium text-gray-500">Day {{ step.day_offset }}</label>
+        <p class="text-sm font-semibold text-gray-900 mt-0.5">{{ step.subject }}</p>
     </div>
     <div>
-        <label class="text-xs font-medium text-gray-500">Subject</label>
-        <p class="text-sm font-medium text-gray-900 mt-0.5">{{ step.subject }}</p>
-    </div>
-    <div>
-        <label class="text-xs font-medium text-gray-500">Body</label>
-        <div class="mt-1 bg-gray-50 rounded-lg p-3 text-sm text-gray-700 whitespace-pre-wrap">{{ body }}</div>
-    </div>
-    <div class="text-xs text-gray-400">
-        Day offset: {{ step.day_offset }} days after enrollment
+        <div class="bg-gray-50 rounded-lg p-3 text-sm text-gray-700 whitespace-pre-wrap">{{ body }}</div>
     </div>
 </div>

@@ -137,9 +137,15 @@
                         <p class="text-sm font-medium text-gray-900">${{ "{:,.0f}".format(proposal.pricing) }} - {{ proposal.status }}</p>
                         <p class="text-xs text-gray-500">Created {{ proposal.created_at.strftime('%d %b %Y') }}</p>
                     </div>
-                    {% if proposal.pdf_path %}
-                    <a href="/proposals/{{ proposal.id }}/pdf" class="text-xs text-blue-600 hover:underline">Download PDF</a>
-                    {% endif %}
+                    <div class="flex items-center gap-2">
+                        <a href="/proposals/{{ proposal.id }}/preview" target="_blank" class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium hover:bg-blue-200 transition-colors">Preview</a>
+                        {% if proposal.pdf_path %}
+                        <a href="/proposals/{{ proposal.id }}/pdf" class="px-2 py-1 bg-navy text-white rounded text-xs font-medium hover:bg-navy-light transition-colors">PDF</a>
+                        {% endif %}
+                        {% if proposal.email_html %}
+                        <a href="/proposals/{{ proposal.id }}/email-preview" target="_blank" class="px-2 py-1 bg-amber-100 text-amber-700 rounded text-xs font-medium hover:bg-amber-200 transition-colors">Email</a>
+                        {% endif %}
+                    </div>
                 </div>
                 {% endfor %}
             </div>
@@ -152,10 +158,39 @@
                 <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div>
                         <p class="text-sm font-medium text-gray-900">{{ enrollment.sequence.name }}</p>
-                        <p class="text-xs text-gray-500">Step {{ enrollment.current_step + 1 }}/{{ enrollment.sequence.steps | length }} - {{ enrollment.status }}</p>
+                        <p class="text-xs text-gray-500">
+                            Step {{ enrollment.current_step + 1 }}/{{ enrollment.sequence.steps | length }}
+                            |
+                            <span class="{% if enrollment.status == 'Active' %}text-green-600{% elif enrollment.status == 'Completed' %}text-blue-600{% else %}text-gray-400{% endif %}">
+                                {{ enrollment.status }}
+                            </span>
+                        </p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button hx-get="/nurture/enrollments/{{ enrollment.id }}/preview?step=0"
+                                hx-target="#email-preview"
+                                hx-swap="innerHTML"
+                                class="px-3 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium hover:bg-blue-200 transition-colors">
+                            Preview Steps
+                        </button>
+                        {% if enrollment.status == 'Active' %}
+                        <form action="/nurture/enrollments/{{ enrollment.id }}/advance" method="post">
+                            <button class="px-3 py-1 bg-green-100 text-green-700 rounded text-xs font-medium hover:bg-green-200 transition-colors">
+                                Send &amp; Advance
+                            </button>
+                        </form>
+                        {% endif %}
                     </div>
                 </div>
                 {% endfor %}
+            </div>
+
+            <!-- Email Preview Panel -->
+            <div class="mt-4 bg-blue-50 border border-blue-100 rounded-lg p-4">
+                <h4 class="text-sm font-medium text-blue-800 mb-2">Email Preview</h4>
+                <div id="email-preview" class="text-sm text-blue-700">
+                    Click "Preview Email" to see what would be sent for the current step.
+                </div>
             </div>
             {% endif %}
 

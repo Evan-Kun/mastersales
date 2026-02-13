@@ -2,7 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 
-from fastapi import FastAPI, Request, Depends, Form, HTTPException
+from fastapi import FastAPI, Request, Depends, Form, Query, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -541,7 +541,12 @@ def nurture_enroll(
 
 
 @app.get("/nurture/enrollments/{enrollment_id}/preview", response_class=HTMLResponse)
-def nurture_preview(request: Request, enrollment_id: int, db: Session = Depends(get_db)):
+def nurture_preview(
+    request: Request,
+    enrollment_id: int,
+    step: int = Query(None),
+    db: Session = Depends(get_db),
+):
     enrollment = db.query(NurtureEnrollment).get(enrollment_id)
     if not enrollment:
         raise HTTPException(status_code=404)
@@ -549,9 +554,14 @@ def nurture_preview(request: Request, enrollment_id: int, db: Session = Depends(
     seq = enrollment.sequence
     contact = enrollment.contact
     company = contact.company
+    total_steps = len(seq.steps)
 
-    step = seq.steps[enrollment.current_step]
-    body = step["body_template"].format(
+    # Allow browsing any step; default to current_step
+    step_idx = step if step is not None else enrollment.current_step
+    step_idx = max(0, min(step_idx, total_steps - 1))
+
+    step_data = seq.steps[step_idx]
+    body = step_data["body_template"].format(
         first_name=contact.first_name,
         last_name=contact.last_name or "",
         company_name=company.company_name if company else "",
@@ -561,16 +571,18 @@ def nurture_preview(request: Request, enrollment_id: int, db: Session = Depends(
 
     return templates.TemplateResponse("partials/nurture_preview.html", {
         "request": request,
-        "step": step,
+        "step": step_data,
         "body": body,
         "enrollment": enrollment,
-        "step_number": enrollment.current_step + 1,
-        "total_steps": len(seq.steps),
+        "step_index": step_idx,
+        "step_number": step_idx + 1,
+        "total_steps": total_steps,
+        "current_step": enrollment.current_step,
     })
 
 
 @app.post("/nurture/enrollments/{enrollment_id}/advance")
-def nurture_advance(enrollment_id: int, db: Session = Depends(get_db)):
+def nurture_advance(request: Request, enrollment_id: int, db: Session = Depends(get_db)):
     enrollment = db.query(NurtureEnrollment).get(enrollment_id)
     if not enrollment:
         raise HTTPException(status_code=404)
@@ -580,6 +592,11 @@ def nurture_advance(enrollment_id: int, db: Session = Depends(get_db)):
     else:
         enrollment.current_step += 1
     db.commit()
+
+    # Redirect back to the referring page (lead detail or nurture)
+    referer = request.headers.get("referer", "")
+    if "/leads/" in referer:
+        return RedirectResponse(referer, status_code=303)
     return RedirectResponse("/nurture", status_code=303)
 
 
@@ -677,6 +694,33 @@ def proposals_download_pdf(proposal_id: int, db: Session = Depends(get_db)):
     if not proposal or not proposal.pdf_path:
         raise HTTPException(status_code=404)
     return FileResponse(proposal.pdf_path, media_type="application/pdf", filename=f"proposal-{proposal_id}.pdf")
+
+
+@app.get("/proposals/{proposal_id}/preview", response_class=HTMLResponse)
+def proposals_preview(request: Request, proposal_id: int, db: Session = Depends(get_db)):
+    """Render the proposal as HTML in the browser (same content as the PDF)."""
+    proposal = db.query(Proposal).get(proposal_id)
+    if not proposal:
+        raise HTTPException(status_code=404)
+
+    contact = proposal.contact
+    company = contact.company if contact else None
+
+    from proposals.pdf_generator import proposal_env
+    template = proposal_env.get_template("proposal.html")
+    html_content = template.render(
+        company=settings.company_name,
+        website=settings.company_website,
+        contact_name=f"{contact.first_name} {contact.last_name or ''}".strip(),
+        company_name=company.company_name if company else "",
+        products=proposal.products,
+        total_price=proposal.pricing,
+        notes="",
+        proposal_number=f"COR-{proposal.created_at.strftime('%Y%m%d%H%M%S')}",
+        date=proposal.created_at.strftime("%d %B %Y"),
+        differentiators=settings.key_differentiators,
+    )
+    return HTMLResponse(html_content)
 
 
 @app.get("/proposals/{proposal_id}/email-preview", response_class=HTMLResponse)
