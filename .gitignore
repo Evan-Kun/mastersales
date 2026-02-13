@@ -6,3 +6,4 @@ mastersales.db
 output/
 .pytest_cache/
 *.egg-info/
+.vercel/
