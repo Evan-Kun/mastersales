@@ -57,8 +57,14 @@ def run_scrape(
     logger.info("=" * 50)
 
     if email and password:
+        try:
+            from scraper.linkedin import LinkedInScraper
+        except ImportError:
+            logger.warning("MODE: Playwright not installed — falling back to demo data")
+            logger.warning("  Live LinkedIn scraping requires: pip install playwright && playwright install chromium")
+            return _generate_demo_results(keywords, location, max_results)
+
         logger.info("MODE: Live LinkedIn scraping")
-        from scraper.linkedin import LinkedInScraper
         scraper = LinkedInScraper(email, password)
         results = scraper.search_people(keywords, location, max_results)
         logger.info(f"SCRAPE JOB COMPLETE: {len(results)} leads found via LinkedIn")
