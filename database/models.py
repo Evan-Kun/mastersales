@@ -7,6 +7,14 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from database.db import Base
 
 
+class AppSetting(Base):
+    """Simple key-value store for app configuration (e.g. LinkedIn credentials)."""
+    __tablename__ = "app_settings"
+
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+
 class Company(Base):
     __tablename__ = "companies"
 

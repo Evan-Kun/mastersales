@@ -30,21 +30,36 @@ def parse_icp_to_search_params(
     }
 
 
-def run_scrape(keywords: list[str], location: str = "Australia", max_results: int = 20) -> list[dict]:
-    """Run the LinkedIn scrape. Uses Playwright if credentials available, otherwise returns demo data."""
+def run_scrape(
+    keywords: list[str],
+    location: str = "Australia",
+    max_results: int = 20,
+    linkedin_email: str = "",
+    linkedin_password: str = "",
+) -> list[dict]:
+    """Run the LinkedIn scrape. Uses Playwright if credentials available, otherwise returns demo data.
+
+    Args:
+        linkedin_email: Override credentials (from web UI). Falls back to global .env config.
+        linkedin_password: Override credentials (from web UI). Falls back to global .env config.
+    """
+    # Use provided credentials, fall back to global config
+    email = linkedin_email or settings.linkedin_email
+    password = linkedin_password or settings.linkedin_password
 
     logger.info("=" * 50)
     logger.info("SCRAPE JOB STARTED")
     logger.info(f"  Keywords: {keywords}")
     logger.info(f"  Location: {location}")
     logger.info(f"  Max results: {max_results}")
-    logger.info(f"  LinkedIn credentials: {'configured' if settings.linkedin_email else 'NOT SET (demo mode)'}")
+    logger.info(f"  LinkedIn credentials: {'configured' if email else 'NOT SET (demo mode)'}")
+    logger.info(f"  Credential source: {'web UI' if linkedin_email else '.env config' if email else 'none'}")
     logger.info("=" * 50)
 
-    if settings.linkedin_email and settings.linkedin_password:
+    if email and password:
         logger.info("MODE: Live LinkedIn scraping")
         from scraper.linkedin import LinkedInScraper
-        scraper = LinkedInScraper(settings.linkedin_email, settings.linkedin_password)
+        scraper = LinkedInScraper(email, password)
         results = scraper.search_people(keywords, location, max_results)
         logger.info(f"SCRAPE JOB COMPLETE: {len(results)} leads found via LinkedIn")
         return results

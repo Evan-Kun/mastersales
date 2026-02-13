@@ -40,13 +40,76 @@
         </div>
 
         <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
-            <p class="text-xs text-amber-800"><strong>Note:</strong> LinkedIn scraping requires valid credentials in your .env file (LINKEDIN_EMAIL and LINKEDIN_PASSWORD). Rate limiting is applied automatically.</p>
+            <p class="text-xs text-amber-800"><strong>Note:</strong> LinkedIn scraping requires valid credentials. Configure them below or in your .env file. Rate limiting is applied automatically.</p>
         </div>
 
         <button type="submit" class="px-6 py-2.5 bg-navy text-white rounded-lg text-sm font-medium hover:bg-navy-light transition-colors">
             Start Scraping
         </button>
     </form>
+</div>
+
+<!-- LinkedIn Credentials -->
+<div x-data="{ open: false }" class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
+    <button @click="open = !open" class="w-full flex items-center justify-between p-4 text-left">
+        <div class="flex items-center gap-3">
+            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+            </svg>
+            <div>
+                <h3 class="text-sm font-semibold text-gray-900">LinkedIn Credentials</h3>
+                <p class="text-xs text-gray-500 mt-0.5">
+                    {% if saved_linkedin_email %}
+                        <span class="text-green-600">Configured via web UI ({{ saved_linkedin_email }})</span>
+                    {% elif has_env_credentials %}
+                        <span class="text-blue-600">Using .env file credentials</span>
+                    {% else %}
+                        <span class="text-amber-600">Not configured — running in demo mode</span>
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+        <svg :class="open ? 'rotate-180' : ''" class="w-4 h-4 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+        </svg>
+    </button>
+
+    <div x-show="open" x-collapse class="border-t border-gray-100 p-4">
+        <form action="/scraper/save-credentials" method="post" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">LinkedIn Email</label>
+                    <input type="email" name="linkedin_email" value="{{ saved_linkedin_email or '' }}"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy focus:border-navy"
+                           placeholder="your@email.com">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">LinkedIn Password</label>
+                    <input type="password" name="linkedin_password" value="{{ saved_linkedin_password or '' }}"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy focus:border-navy"
+                           placeholder="••••••••">
+                </div>
+            </div>
+
+            {% if has_env_credentials %}
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p class="text-xs text-blue-800">Your .env file has credentials set. Web UI credentials take priority when configured.</p>
+            </div>
+            {% endif %}
+
+            <div class="flex items-center gap-3">
+                <button type="submit" class="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition-colors">
+                    Save Credentials
+                </button>
+                {% if saved_linkedin_email %}
+                <button type="submit" name="linkedin_email" value="" class="px-4 py-2 bg-white text-gray-600 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                        onclick="this.form.querySelector('[name=linkedin_password]').value='';">
+                    Clear
+                </button>
+                {% endif %}
+            </div>
+        </form>
+    </div>
 </div>
 
 <!-- Results -->
