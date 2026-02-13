@@ -3,6 +3,6 @@ __pycache__/
 *.pyc
 .env
 mastersales.db
-output/proposals/*.pdf
+output/
 .pytest_cache/
 *.egg-info/
