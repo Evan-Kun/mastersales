@@ -20,36 +20,87 @@
 {% endif %}
 
 {% if results %}
-<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-    <table class="w-full">
-        <thead class="bg-gray-50 border-b border-gray-200">
-            <tr>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">#</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Company</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
-            </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-100">
-            {% for result in results %}
-            <tr class="hover:bg-gray-50">
-                <td class="px-4 py-3 text-sm text-gray-500">{{ loop.index }}</td>
-                <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ result.first_name }} {{ result.get('last_name', '') }}</td>
-                <td class="px-4 py-3 text-sm text-gray-600">{{ result.get('job_title', '-') }}</td>
-                <td class="px-4 py-3 text-sm text-gray-600">{{ result.get('company_name', '-') }}</td>
-                <td class="px-4 py-3 text-sm text-gray-600">{{ result.get('location_city', '') }}{% if result.get('location_state') %}, {{ result.location_state }}{% endif %}</td>
-                <td class="px-4 py-3">
-                    <form action="/scraper/add/{{ loop.index0 }}" method="post" style="display:inline">
-                        <button type="submit" class="px-3 py-1 bg-green-100 text-green-700 rounded text-xs font-medium hover:bg-green-200 transition-colors">
+<form id="bulk-add-form" hx-post="/scraper/add-bulk" hx-target="#scraper-results" hx-swap="innerHTML">
+    <!-- Bulk action bar -->
+    <div class="flex items-center justify-between bg-white border border-gray-200 rounded-t-xl px-4 py-3">
+        <div class="flex items-center gap-3">
+            <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="select-all" class="w-4 h-4 rounded border-gray-300 text-navy focus:ring-navy"
+                       onchange="document.querySelectorAll('.lead-checkbox').forEach(cb => cb.checked = this.checked); updateBulkCount();">
+                <span class="text-sm font-medium text-gray-700">Select All</span>
+            </label>
+            <span id="bulk-count" class="text-xs text-gray-500">({{ results|length }} results)</span>
+        </div>
+        <button type="submit" class="px-4 py-2 bg-navy text-white rounded-lg text-sm font-medium hover:bg-navy-light transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                id="bulk-add-btn" disabled>
+            Add Selected to Leads
+        </button>
+    </div>
+
+    <!-- Results table -->
+    <div class="bg-white rounded-b-xl shadow-sm border border-t-0 border-gray-100 overflow-hidden">
+        <table class="w-full">
+            <thead class="bg-gray-50 border-b border-gray-200">
+                <tr>
+                    <th class="px-4 py-3 w-10"></th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">#</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Company</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for result in results %}
+                {% set is_added = added_indices is defined and loop.index0 in added_indices %}
+                <tr class="{{ 'bg-green-50' if is_added else 'hover:bg-gray-50' }}" id="row-{{ loop.index0 }}">
+                    <td class="px-4 py-3">
+                        {% if is_added %}
+                        <input type="checkbox" disabled class="w-4 h-4 rounded border-gray-300 opacity-50">
+                        {% else %}
+                        <input type="checkbox" name="indices" value="{{ loop.index0 }}" class="lead-checkbox w-4 h-4 rounded border-gray-300 text-navy focus:ring-navy"
+                               onchange="updateBulkCount()">
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-sm {{ 'text-gray-400' if is_added else 'text-gray-500' }}">{{ loop.index }}</td>
+                    <td class="px-4 py-3 text-sm font-medium {{ 'text-gray-500' if is_added else 'text-gray-900' }}">{{ result.first_name }} {{ result.get('last_name', '') }}</td>
+                    <td class="px-4 py-3 text-sm {{ 'text-gray-400' if is_added else 'text-gray-600' }}">{{ result.get('job_title', '-') }}</td>
+                    <td class="px-4 py-3 text-sm {{ 'text-gray-400' if is_added else 'text-gray-600' }}">{{ result.get('company_name', '-') }}</td>
+                    <td class="px-4 py-3 text-sm {{ 'text-gray-400' if is_added else 'text-gray-600' }}">{{ result.get('location_city', '') }}{% if result.get('location_state') %}, {{ result.location_state }}{% endif %}</td>
+                    <td class="px-4 py-3">
+                        {% if is_added %}
+                        <span class="px-3 py-1 bg-green-200 text-green-800 rounded text-xs font-medium">Added</span>
+                        {% else %}
+                        <button type="button"
+                                hx-post="/scraper/add/{{ loop.index0 }}"
+                                hx-target="#row-{{ loop.index0 }}"
+                                hx-swap="outerHTML"
+                                class="px-3 py-1 bg-green-100 text-green-700 rounded text-xs font-medium hover:bg-green-200 transition-colors">
                             + Add to Leads
                         </button>
-                    </form>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</form>
+
+<script>
+function updateBulkCount() {
+    const checked = document.querySelectorAll('.lead-checkbox:checked').length;
+    const total = document.querySelectorAll('.lead-checkbox').length;
+    const btn = document.getElementById('bulk-add-btn');
+    const countEl = document.getElementById('bulk-count');
+    const selectAll = document.getElementById('select-all');
+
+    btn.disabled = checked === 0;
+    btn.textContent = checked > 0 ? `Add ${checked} Selected to Leads` : 'Add Selected to Leads';
+    countEl.textContent = checked > 0 ? `(${checked} of ${total} selected)` : `(${total} results)`;
+    selectAll.checked = checked === total && total > 0;
+    selectAll.indeterminate = checked > 0 && checked < total;
+}
+</script>
 {% endif %}

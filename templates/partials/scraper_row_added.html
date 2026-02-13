@@ -1,0 +1,17 @@
+<tr class="{{ 'bg-amber-50' if status == 'duplicate' else 'bg-green-50' }}" id="row-{{ index }}">
+    <td class="px-4 py-3">
+        <input type="checkbox" disabled class="w-4 h-4 rounded border-gray-300 opacity-50">
+    </td>
+    <td class="px-4 py-3 text-sm text-gray-400">{{ num }}</td>
+    <td class="px-4 py-3 text-sm font-medium text-gray-500">{{ name }}</td>
+    <td class="px-4 py-3 text-sm text-gray-400">{{ title }}</td>
+    <td class="px-4 py-3 text-sm text-gray-400">{{ company }}</td>
+    <td class="px-4 py-3 text-sm text-gray-400">{{ location }}</td>
+    <td class="px-4 py-3">
+        {% if status == 'duplicate' %}
+        <span class="px-3 py-1 bg-amber-200 text-amber-800 rounded text-xs font-medium">Already exists</span>
+        {% else %}
+        <span class="px-3 py-1 bg-green-200 text-green-800 rounded text-xs font-medium">Added</span>
+        {% endif %}
+    </td>
+</tr>

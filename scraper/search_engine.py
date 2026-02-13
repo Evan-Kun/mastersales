@@ -1,7 +1,10 @@
 import time
 import random
+import logging
 from urllib.parse import quote_plus
 from config import settings
+
+logger = logging.getLogger("mastersales.scraper")
 
 
 def build_linkedin_search_url(keywords: list[str], location: str = "Australia") -> str:
@@ -30,43 +33,141 @@ def parse_icp_to_search_params(
 def run_scrape(keywords: list[str], location: str = "Australia", max_results: int = 20) -> list[dict]:
     """Run the LinkedIn scrape. Uses Playwright if credentials available, otherwise returns demo data."""
 
+    logger.info("=" * 50)
+    logger.info("SCRAPE JOB STARTED")
+    logger.info(f"  Keywords: {keywords}")
+    logger.info(f"  Location: {location}")
+    logger.info(f"  Max results: {max_results}")
+    logger.info(f"  LinkedIn credentials: {'configured' if settings.linkedin_email else 'NOT SET (demo mode)'}")
+    logger.info("=" * 50)
+
     if settings.linkedin_email and settings.linkedin_password:
-        try:
-            from scraper.linkedin import LinkedInScraper
-            scraper = LinkedInScraper(settings.linkedin_email, settings.linkedin_password)
-            return scraper.search_people(keywords, location, max_results)
-        except Exception as e:
-            print(f"LinkedIn scraper error: {e}")
-            return _generate_demo_results(keywords, location, max_results)
+        logger.info("MODE: Live LinkedIn scraping")
+        from scraper.linkedin import LinkedInScraper
+        scraper = LinkedInScraper(settings.linkedin_email, settings.linkedin_password)
+        results = scraper.search_people(keywords, location, max_results)
+        logger.info(f"SCRAPE JOB COMPLETE: {len(results)} leads found via LinkedIn")
+        return results
     else:
+        logger.info("MODE: Demo data (no LinkedIn credentials)")
         return _generate_demo_results(keywords, location, max_results)
 
 
+_FIRST_NAMES = [
+    "Michael", "Jennifer", "Robert", "Tane", "Karen", "Steven", "Linda", "Rawiri",
+    "Craig", "Priya", "Daniel", "Grace", "Wayne", "Sophie", "Ian", "David",
+    "Sarah", "James", "Emily", "Mark", "Aroha", "Peter", "Megan", "Hemi",
+    "Andrew", "Rachel", "Scott", "Nikita", "Tom", "Anita", "Brett", "Claire",
+    "Nathan", "Lisa", "Aaron", "Deepa", "Paul", "Joanne", "Ravi", "Bridget",
+    "Shane", "Kylie", "Liam", "Fatima", "Chris", "Ngaire", "Adam", "Wendy",
+    "George", "Tamara", "Marcus", "Ingrid", "Wiremu", "Katrina", "Darren", "Mei",
+    "Colin", "Vanessa", "Ethan", "Sonia",
+]
+
+_LAST_NAMES = [
+    "Anderson", "Walsh", "Hughes", "Wiremu", "Mitchell", "Park", "Foster", "Henare",
+    "McDonald", "Sharma", "O'Sullivan", "Lee", "Barrett", "Turner", "Campbell", "Clarke",
+    "Richards", "Patel", "Thompson", "Cooper", "Singh", "Jenkins", "Harris", "Taylor",
+    "Brown", "Wilson", "O'Brien", "Martin", "Young", "King", "White", "Robinson",
+    "Wright", "Nguyen", "Stewart", "Kelly", "Davis", "Zhang", "Morgan", "Baker",
+    "Scott", "Murray", "Wood", "Morris", "Gray", "Mason", "Bell", "Duncan",
+    "Ross", "Fraser", "Hamilton", "Crawford", "Johnston", "Kaur", "Adams", "Gordon",
+    "Stone", "Fox", "Blair", "Cole",
+]
+
+_JOB_TITLES = [
+    "Steel Fabrication Manager", "Corrosion Engineer", "Maintenance Director",
+    "Shipyard Operations Manager", "Procurement Specialist - Coatings",
+    "Quality Control Manager", "Site Engineer", "Workshop Foreman",
+    "Rust Prevention Specialist", "Materials Engineer", "Fabrication Supervisor",
+    "Protective Coatings Inspector", "Plant Manager", "Supply Chain Manager",
+    "Underground Mining Engineer", "Structural Engineer", "Asset Integrity Manager",
+    "Project Engineer - Steel Structures", "Surface Preparation Supervisor",
+    "Welding Inspector", "Operations Manager", "Workshop Manager",
+    "Coating Application Technician", "Safety & Compliance Manager",
+    "Procurement Manager - Industrial Coatings", "Production Supervisor",
+    "Mining Operations Engineer", "Civil & Structural Lead", "Fleet Maintenance Manager",
+    "Infrastructure Project Manager", "HSE Manager", "Marine Coatings Specialist",
+    "Blast & Paint Supervisor", "Reliability Engineer", "Warehouse & Logistics Manager",
+    "Technical Sales Manager - Coatings", "Workshop Superintendent",
+    "Pipeline Integrity Engineer", "Contracts Manager", "Plant Maintenance Planner",
+]
+
+_COMPANIES = [
+    ("Precision Steel WA", "Perth", "WA", "AU"),
+    ("AusCoat Solutions", "Melbourne", "VIC", "AU"),
+    ("Iron Range Mining", "Kalgoorlie", "WA", "AU"),
+    ("Pacific Dockyard NZ", "Wellington", "Wellington", "NZ"),
+    ("BHP Nickel West", "Perth", "WA", "AU"),
+    ("Steel Blue Fabrications", "Geelong", "VIC", "AU"),
+    ("Fortescue Metals Group", "Port Hedland", "WA", "AU"),
+    ("Kiwi Steel Structures", "Auckland", "Auckland", "NZ"),
+    ("Coastal Engineering VIC", "Frankston", "VIC", "AU"),
+    ("Rio Tinto Iron Ore", "Newman", "WA", "AU"),
+    ("Murray Steel Works", "Ballarat", "VIC", "AU"),
+    ("Downer Group", "Perth", "WA", "AU"),
+    ("Tasman Steel NZ", "Christchurch", "Canterbury", "NZ"),
+    ("BlueScope Steel", "Melbourne", "VIC", "AU"),
+    ("Newmont Boddington", "Boddington", "WA", "AU"),
+    ("Civmec Construction", "Henderson", "WA", "AU"),
+    ("Monadelphous Group", "Perth", "WA", "AU"),
+    ("NZ Steel", "Glenbrook", "Waikato", "NZ"),
+    ("Southern Cross Fabrication", "Bunbury", "WA", "AU"),
+    ("OneSteel Metalcentre", "Dandenong", "VIC", "AU"),
+    ("CSBP Chemicals", "Kwinana", "WA", "AU"),
+    ("Worley Parsons", "Perth", "WA", "AU"),
+    ("Fletcher Steel NZ", "Hamilton", "Waikato", "NZ"),
+    ("Austal Ships", "Henderson", "WA", "AU"),
+    ("Transfield Services", "Sydney", "NSW", "AU"),
+    ("John Holland Group", "Melbourne", "VIC", "AU"),
+    ("Pilbara Minerals", "Pilgangoora", "WA", "AU"),
+    ("South32 Worsley Alumina", "Collie", "WA", "AU"),
+    ("Steel & Tube NZ", "Lower Hutt", "Wellington", "NZ"),
+    ("Valmec Engineering", "Welshpool", "WA", "AU"),
+]
+
+
 def _generate_demo_results(keywords: list[str], location: str, max_results: int) -> list[dict]:
-    """Generate realistic demo scraping results when LinkedIn credentials are not available."""
+    """Generate realistic demo scraping results for any requested count."""
 
-    demo_people = [
-        {"first_name": "Michael", "last_name": "Anderson", "job_title": "Steel Fabrication Manager", "company_name": "Precision Steel WA", "location_city": "Perth", "location_state": "WA", "location_country": "AU", "linkedin_url": "https://linkedin.com/in/michael-anderson-steel"},
-        {"first_name": "Jennifer", "last_name": "Walsh", "job_title": "Corrosion Engineer", "company_name": "AusCoat Solutions", "location_city": "Melbourne", "location_state": "VIC", "location_country": "AU", "linkedin_url": "https://linkedin.com/in/jennifer-walsh-corrosion"},
-        {"first_name": "Robert", "last_name": "Hughes", "job_title": "Maintenance Director", "company_name": "Iron Range Mining", "location_city": "Kalgoorlie", "location_state": "WA", "location_country": "AU", "linkedin_url": "https://linkedin.com/in/robert-hughes-mining"},
-        {"first_name": "Tane", "last_name": "Wiremu", "job_title": "Shipyard Operations Manager", "company_name": "Pacific Dockyard NZ", "location_city": "Wellington", "location_state": "Wellington", "location_country": "NZ", "linkedin_url": "https://linkedin.com/in/tane-wiremu-nz"},
-        {"first_name": "Karen", "last_name": "Mitchell", "job_title": "Procurement Specialist - Coatings", "company_name": "BHP Nickel West", "location_city": "Perth", "location_state": "WA", "location_country": "AU", "linkedin_url": "https://linkedin.com/in/karen-mitchell-bhp"},
-        {"first_name": "Steven", "last_name": "Park", "job_title": "Quality Control Manager", "company_name": "Steel Blue Fabrications", "location_city": "Geelong", "location_state": "VIC", "location_country": "AU", "linkedin_url": "https://linkedin.com/in/steven-park-qa"},
-        {"first_name": "Linda", "last_name": "Foster", "job_title": "Site Engineer", "company_name": "Fortescue Metals Group", "location_city": "Port Hedland", "location_state": "WA", "location_country": "AU", "linkedin_url": "https://linkedin.com/in/linda-foster-fmg"},
-        {"first_name": "Rawiri", "last_name": "Henare", "job_title": "Workshop Foreman", "company_name": "Kiwi Steel Structures", "location_city": "Auckland", "location_state": "Auckland", "location_country": "NZ", "linkedin_url": "https://linkedin.com/in/rawiri-henare-steel"},
-        {"first_name": "Craig", "last_name": "McDonald", "job_title": "Rust Prevention Specialist", "company_name": "Coastal Engineering VIC", "location_city": "Frankston", "location_state": "VIC", "location_country": "AU", "linkedin_url": "https://linkedin.com/in/craig-mcdonald-coastal"},
-        {"first_name": "Priya", "last_name": "Sharma", "job_title": "Materials Engineer", "company_name": "Rio Tinto Iron Ore", "location_city": "Newman", "location_state": "WA", "location_country": "AU", "linkedin_url": "https://linkedin.com/in/priya-sharma-materials"},
-        {"first_name": "Daniel", "last_name": "O'Sullivan", "job_title": "Fabrication Supervisor", "company_name": "Murray Steel Works", "location_city": "Ballarat", "location_state": "VIC", "location_country": "AU", "linkedin_url": "https://linkedin.com/in/daniel-osullivan-fab"},
-        {"first_name": "Grace", "last_name": "Lee", "job_title": "Protective Coatings Inspector", "company_name": "Downer Group", "location_city": "Perth", "location_state": "WA", "location_country": "AU", "linkedin_url": "https://linkedin.com/in/grace-lee-coatings"},
-        {"first_name": "Wayne", "last_name": "Barrett", "job_title": "Plant Manager", "company_name": "Tasman Steel NZ", "location_city": "Christchurch", "location_state": "Canterbury", "location_country": "NZ", "linkedin_url": "https://linkedin.com/in/wayne-barrett-tasman"},
-        {"first_name": "Sophie", "last_name": "Turner", "job_title": "Supply Chain Manager", "company_name": "BlueScope Steel", "location_city": "Melbourne", "location_state": "VIC", "location_country": "AU", "linkedin_url": "https://linkedin.com/in/sophie-turner-bluescope"},
-        {"first_name": "Ian", "last_name": "Campbell", "job_title": "Underground Mining Engineer", "company_name": "Newmont Boddington", "location_city": "Boddington", "location_state": "WA", "location_country": "AU", "linkedin_url": "https://linkedin.com/in/ian-campbell-newmont"},
-    ]
+    logger.info(f"Generating {max_results} demo results...")
 
-    results = demo_people[:max_results]
+    # Use a seeded RNG so the same keywords produce consistent results
+    seed = hash(tuple(sorted(keywords))) & 0xFFFFFFFF
+    rng = random.Random(seed)
 
-    # Simulate scraping delay
+    results = []
+    used_names = set()
+
+    for _ in range(max_results):
+        # Pick a unique first+last combo
+        for _attempt in range(50):
+            first = rng.choice(_FIRST_NAMES)
+            last = rng.choice(_LAST_NAMES)
+            if (first, last) not in used_names:
+                used_names.add((first, last))
+                break
+
+        title = rng.choice(_JOB_TITLES)
+        company, city, state, country = rng.choice(_COMPANIES)
+        slug = f"{first.lower()}-{last.lower().replace(chr(39), '')}-{rng.randint(100,999)}"
+
+        results.append({
+            "first_name": first,
+            "last_name": last,
+            "job_title": title,
+            "company_name": company,
+            "location_city": city,
+            "location_state": state,
+            "location_country": country,
+            "linkedin_url": f"https://linkedin.com/in/{slug}",
+        })
+
+    # Simulate scraping delay with logging
     for i, result in enumerate(results):
-        time.sleep(random.uniform(0.1, 0.3))
+        delay = rng.uniform(0.05, 0.15)
+        time.sleep(delay)
+        logger.info(f"  [DEMO {i+1}/{len(results)}] {result['first_name']} {result['last_name']} - {result['job_title']}")
 
+    logger.info(f"Demo scrape complete: {len(results)} leads generated")
     return results

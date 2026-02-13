@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 
@@ -26,6 +27,14 @@ async def lifespan(app: FastAPI):
         db.close()
     yield
 
+
+# ── Logging ────────────────────────────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger("mastersales")
 
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -277,13 +286,17 @@ def scraper_start(
     if not keyword_list:
         keyword_list = settings.industry_keywords[:5]
 
+    logger.info(f"WEB: Scrape requested — keywords={keyword_list}, location={location}, max={max_results}")
+
     def _scrape():
         try:
             results = run_scrape(keyword_list, location, max_results)
             scraper_results.extend(results)
             scraper_status.update({"running": False, "found": len(results), "message": f"Complete. Found {len(results)} leads."})
+            logger.info(f"WEB: Scrape finished — {len(results)} leads found")
         except Exception as e:
             scraper_status.update({"running": False, "found": 0, "message": f"Error: {str(e)}"})
+            logger.error(f"WEB: Scrape failed — {e}")
 
     thread = threading.Thread(target=_scrape, daemon=True)
     thread.start()
@@ -304,13 +317,30 @@ def scraper_status_check(request: Request):
     })
 
 
-@app.post("/scraper/add/{index}")
-def scraper_add_lead(index: int, db: Session = Depends(get_db)):
+def _add_scraper_result_to_db(index: int, db: Session) -> tuple[dict | None, str]:
+    """Save a single scraper result to the database.
+
+    Returns (result_dict, status) where status is 'added', 'duplicate', or 'error'.
+    """
     if index < 0 or index >= len(scraper_results):
-        raise HTTPException(status_code=404, detail="Result not found")
+        return None, "error"
 
     result = scraper_results[index]
 
+    # Check for duplicate by linkedin_url OR by first+last name
+    existing = None
+    if result.get("linkedin_url"):
+        existing = db.query(Contact).filter(Contact.linkedin_url == result["linkedin_url"]).first()
+    if not existing and result.get("first_name") and result.get("last_name"):
+        existing = db.query(Contact).filter(
+            Contact.first_name == result["first_name"],
+            Contact.last_name == result["last_name"],
+        ).first()
+
+    if existing:
+        return result, "duplicate"
+
+    # Find or create company
     company = None
     if result.get("company_name"):
         company = db.query(Company).filter(Company.company_name == result["company_name"]).first()
@@ -324,27 +354,69 @@ def scraper_add_lead(index: int, db: Session = Depends(get_db)):
             db.add(company)
             db.flush()
 
-    existing = None
-    if result.get("linkedin_url"):
-        existing = db.query(Contact).filter(Contact.linkedin_url == result["linkedin_url"]).first()
+    contact = Contact(
+        first_name=result.get("first_name", ""),
+        last_name=result.get("last_name", ""),
+        job_title=result.get("job_title", ""),
+        linkedin_url=result.get("linkedin_url"),
+        location_city=result.get("location_city", ""),
+        location_state=result.get("location_state", ""),
+        location_country=result.get("location_country", "AU"),
+        lead_status="New",
+        lead_source="LinkedIn",
+        company_id=company.id if company else None,
+    )
+    db.add(contact)
 
-    if not existing:
-        contact = Contact(
-            first_name=result.get("first_name", ""),
-            last_name=result.get("last_name", ""),
-            job_title=result.get("job_title", ""),
-            linkedin_url=result.get("linkedin_url"),
-            location_city=result.get("location_city", ""),
-            location_state=result.get("location_state", ""),
-            location_country=result.get("location_country", "AU"),
-            lead_status="New",
-            lead_source="LinkedIn",
-            company_id=company.id if company else None,
-        )
-        db.add(contact)
-        db.commit()
+    return result, "added"
 
-    return RedirectResponse("/leads", status_code=303)
+
+@app.post("/scraper/add/{index}", response_class=HTMLResponse)
+def scraper_add_lead(request: Request, index: int, db: Session = Depends(get_db)):
+    result, status = _add_scraper_result_to_db(index, db)
+    if not result:
+        raise HTTPException(status_code=404, detail="Result not found")
+    db.commit()
+
+    loc = result.get("location_city", "")
+    if result.get("location_state"):
+        loc += f", {result['location_state']}"
+
+    return templates.TemplateResponse("partials/scraper_row_added.html", {
+        "request": request,
+        "index": index,
+        "num": index + 1,
+        "name": f"{result.get('first_name', '')} {result.get('last_name', '')}",
+        "title": result.get("job_title", "-"),
+        "company": result.get("company_name", "-"),
+        "location": loc,
+        "status": status,
+    })
+
+
+@app.post("/scraper/add-bulk", response_class=HTMLResponse)
+def scraper_add_bulk(request: Request, indices: list[int] = Form(...), db: Session = Depends(get_db)):
+    added = 0
+    duplicates = 0
+    for idx in indices:
+        result, status = _add_scraper_result_to_db(idx, db)
+        if status == "added":
+            added += 1
+        elif status == "duplicate":
+            duplicates += 1
+    db.commit()
+
+    msg = f"Added {added} leads to your CRM."
+    if duplicates:
+        msg += f" {duplicates} already existed (skipped)."
+    logger.info(f"WEB: Bulk add — {added} new, {duplicates} duplicates")
+
+    return templates.TemplateResponse("partials/scraper_status.html", {
+        "request": request,
+        "scraper_status": {"running": False, "found": scraper_status.get("found", 0), "message": msg},
+        "results": scraper_results,
+        "added_indices": indices,
+    })
 
 
 # ── Scheduler ──────────────────────────────────────────────────────────────────
@@ -632,6 +704,6 @@ if __name__ == "__main__":
     print("\n" + "=" * 60)
     print("  MasterSales - Sales Activation Platform")
     print(f"  Company: {settings.company_name}")
-    print("  Open: http://127.0.0.1:8000")
+    print("  Open: http://127.0.0.1:8899")
     print("=" * 60 + "\n")
-    uvicorn.run("app:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("app:app", host="127.0.0.1", port=8899, reload=True)
