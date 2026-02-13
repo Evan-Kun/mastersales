@@ -93,7 +93,7 @@ class LinkedInScraper:
         # LinkedIn updated their login page — try multiple selectors
         logger.info("  Filling credentials...")
         email_filled = False
-        for selector in ['#username', 'input[name="session_key"]', 'input[autocomplete="username"]', 'input[type="text"]']:
+        for selector in ['#username', 'input[name="session_key"]', 'input[autocomplete="username"]']:
             try:
                 el = self.page.query_selector(selector)
                 if el:
@@ -105,12 +105,12 @@ class LinkedInScraper:
                 continue
 
         if not email_filled:
-            # Last resort: use label text
-            self.page.get_by_label("Email or phone").fill(self.email)
-            logger.info("  Email filled via label 'Email or phone'")
+            # LinkedIn may render duplicate inputs (desktop + mobile) — use .first
+            self.page.get_by_label("Email or phone").first.fill(self.email)
+            logger.info("  Email filled via label 'Email or phone' (.first)")
 
         pwd_filled = False
-        for selector in ['#password', 'input[name="session_password"]', 'input[autocomplete="current-password"]', 'input[type="password"]']:
+        for selector in ['#password', 'input[name="session_password"]', 'input[autocomplete="current-password"]']:
             try:
                 el = self.page.query_selector(selector)
                 if el:
@@ -122,8 +122,8 @@ class LinkedInScraper:
                 continue
 
         if not pwd_filled:
-            self.page.get_by_label("Password").fill(self.password)
-            logger.info("  Password filled via label 'Password'")
+            self.page.get_by_label("Password").first.fill(self.password)
+            logger.info("  Password filled via label 'Password' (.first)")
 
         logger.info("  Submitting login form...")
         # Try multiple submit selectors
@@ -138,7 +138,7 @@ class LinkedInScraper:
             except Exception:
                 continue
         if not submitted:
-            self.page.get_by_role("button", name="Sign in").click()
+            self.page.get_by_role("button", name="Sign in").first.click()
         self._random_delay("login submit")
 
         try:
