@@ -142,10 +142,15 @@ class LinkedInScraper:
         self._random_delay("login submit")
 
         try:
-            self.page.wait_for_url("**/feed/**", timeout=30000)
+            self.page.wait_for_url("**/feed*", timeout=30000)
             logger.info("  LOGIN SUCCESS - redirected to feed")
         except Exception as e:
             current_url = self.page.url
+            # Check if we actually landed on feed despite the timeout
+            if "/feed" in current_url:
+                logger.info("  LOGIN SUCCESS - on feed (detected after wait)")
+                return
+
             logger.error(f"  LOGIN FAILED - stuck at: {current_url}")
 
             if "checkpoint" in current_url:
