@@ -17,8 +17,10 @@ sudo apt-get install -y --no-install-recommends \
     libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b libffi-dev \
     libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
     libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 libgbm1 \
-    libasound2 libpangocairo-1.0-0 libgtk-3-0 libxshmfence1 \
+    libpangocairo-1.0-0 libgtk-3-0 libxshmfence1 \
     nginx certbot python3-certbot-nginx
+# libasound2 was renamed in Ubuntu 24.04+
+sudo apt-get install -y libasound2 2>/dev/null || sudo apt-get install -y libasound2t64
 
 # --- Clone project ---
 echo "[2/6] Cloning MasterSales..."
