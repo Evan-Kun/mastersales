@@ -165,7 +165,8 @@ cp .env.example .env
 Edit `.env` with your settings:
 
 ```env
-# LinkedIn credentials (optional — leave empty for demo mode)
+# LinkedIn credentials (optional — configure via web UI or here)
+# Web UI credentials (Lead Sourcing page) take priority over .env
 LINKEDIN_EMAIL=
 LINKEDIN_PASSWORD=
 
@@ -208,9 +209,9 @@ pytest tests/ -v
 6. Use **Select All** + **Add Selected to Leads** for bulk import
 7. Duplicates are detected by LinkedIn URL and name — shown with amber "Already exists" badge
 
-**Demo mode**: If no LinkedIn credentials are set in `.env`, the scraper generates realistic demo data using seeded random names, titles, and companies.
+**Demo mode**: If no LinkedIn credentials are configured, the scraper generates realistic demo data using seeded random names, titles, and companies.
 
-**Live mode**: With LinkedIn credentials configured, Playwright logs into LinkedIn, runs people searches with geo-filtering, and extracts results from the rendered DOM.
+**Live mode**: Configure LinkedIn credentials via the **LinkedIn Credentials** section on the Lead Sourcing page (or in `.env` as fallback). Playwright logs into LinkedIn, runs people searches with geo-filtering, and extracts results from the rendered DOM.
 
 ### Proposals
 
