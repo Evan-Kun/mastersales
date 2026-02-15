@@ -14,45 +14,96 @@ OUTPUT_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "output")
 
 # LinkedIn geoUrn IDs for location filtering
 GEO_URNS = {
+    # Countries
     "Australia": ["101452733"],
     "New Zealand": ["104107862"],
+    # Australian states
     "Western Australia, Australia": ["106164952"],
     "Victoria, Australia": ["100803684"],
     "New South Wales, Australia": ["104769905"],
     "Queensland, Australia": ["104166042"],
-    # Combined
+    # Australian cities (metro areas)
+    "Melbourne": ["90009521"],
+    "Sydney": ["90009524"],
+    "Perth": ["90009523"],
+    "Brisbane": ["90009522"],
+    "Adelaide": ["107042567"],
+    "Canberra": ["106089960"],
+    # Combined / shortcuts
     "AU": ["101452733"],
     "NZ": ["104107862"],
     "AU+NZ": ["101452733", "104107862"],
 }
 
-def _build_geo_param(location: str) -> str:
-    """Convert location string to LinkedIn geoUrn URL parameter."""
+def _resolve_single_location(location: str) -> list[str]:
+    """Resolve a single location string to a list of geoUrn IDs."""
     # Check exact match first
     urns = GEO_URNS.get(location)
 
     if not urns:
-        # Try fuzzy matching
-        loc_lower = location.lower()
+        # Try fuzzy matching — cities first (most specific), then states, then countries
+        loc_lower = location.lower().strip()
+
+        # Combined regions
         if ("australia" in loc_lower and "new zealand" in loc_lower) or "au+nz" in loc_lower or "au & nz" in loc_lower:
             urns = GEO_URNS["AU+NZ"]
+        # Cities (check before states so "Melbourne" doesn't fall through to "Victoria")
+        elif "melbourne" in loc_lower:
+            urns = GEO_URNS["Melbourne"]
+        elif "sydney" in loc_lower:
+            urns = GEO_URNS["Sydney"]
+        elif "perth" in loc_lower:
+            urns = GEO_URNS["Perth"]
+        elif "brisbane" in loc_lower:
+            urns = GEO_URNS["Brisbane"]
+        elif "adelaide" in loc_lower:
+            urns = GEO_URNS["Adelaide"]
+        elif "canberra" in loc_lower:
+            urns = GEO_URNS["Canberra"]
+        # Other AU cities → map to their state
+        elif "gold coast" in loc_lower:
+            urns = GEO_URNS["Queensland, Australia"]
+        elif "newcastle" in loc_lower or "hunter" in loc_lower:
+            urns = GEO_URNS["New South Wales, Australia"]
+        elif "geelong" in loc_lower or "ballarat" in loc_lower or "bendigo" in loc_lower:
+            urns = GEO_URNS["Victoria, Australia"]
+        # States
         elif "western australia" in loc_lower or loc_lower == "wa":
             urns = GEO_URNS["Western Australia, Australia"]
         elif "victoria" in loc_lower or loc_lower == "vic":
             urns = GEO_URNS["Victoria, Australia"]
         elif "new south wales" in loc_lower or loc_lower == "nsw":
             urns = GEO_URNS["New South Wales, Australia"]
+        elif "queensland" in loc_lower or loc_lower == "qld":
+            urns = GEO_URNS["Queensland, Australia"]
+        # Countries
         elif "new zealand" in loc_lower or loc_lower == "nz":
             urns = GEO_URNS["NZ"]
         elif "australia" in loc_lower or loc_lower == "au":
             urns = GEO_URNS["AU"]
 
-    if not urns:
+    return urns or []
+
+
+def _build_geo_param(location: str) -> str:
+    """Convert location string (single or pipe-separated) to LinkedIn geoUrn URL parameter."""
+    # Split on pipe for multi-select from the UI
+    parts = [p.strip() for p in location.split("|") if p.strip()]
+
+    all_urns = []
+    seen = set()
+    for part in parts:
+        for urn in _resolve_single_location(part):
+            if urn not in seen:
+                seen.add(urn)
+                all_urns.append(urn)
+
+    if not all_urns:
         # Default: Australia + New Zealand
-        urns = GEO_URNS["AU+NZ"]
+        all_urns = GEO_URNS["AU+NZ"]
 
     # LinkedIn format: geoUrn=["id1","id2"]
-    urn_list = "%5B" + "%2C".join(f"%22{u}%22" for u in urns) + "%5D"
+    urn_list = "%5B" + "%2C".join(f"%22{u}%22" for u in all_urns) + "%5D"
     return f"&geoUrn={urn_list}"
 
 

@@ -18,17 +18,38 @@
                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy focus:border-navy"
                        placeholder="steel, corrosion, fabrication...">
             </div>
-            <div>
+            <div x-data="locationPicker()" @click.outside="open = false" class="relative">
                 <label class="block text-xs font-medium text-gray-500 mb-1">Location</label>
-                <select name="location" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                    <option value="Australia and New Zealand" selected>Australia + New Zealand</option>
-                    <option value="Australia">Australia only</option>
-                    <option value="Western Australia, Australia">Western Australia</option>
-                    <option value="Victoria, Australia">Victoria</option>
-                    <option value="New South Wales, Australia">New South Wales</option>
-                    <option value="Queensland, Australia">Queensland</option>
-                    <option value="New Zealand">New Zealand only</option>
-                </select>
+                <input type="hidden" name="location" :value="selected.join('|')">
+                <!-- Tag display + input -->
+                <div @click="$refs.searchInput.focus(); open = true"
+                     class="w-full min-h-[38px] px-2 py-1.5 border border-gray-300 rounded-lg text-sm flex flex-wrap items-center gap-1 cursor-text focus-within:ring-2 focus-within:ring-navy focus-within:border-navy bg-white">
+                    <template x-for="loc in selected" :key="loc">
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-navy/10 text-navy rounded text-xs font-medium whitespace-nowrap">
+                            <span x-text="loc"></span>
+                            <button type="button" @click.stop="remove(loc)" class="hover:text-red-600">&times;</button>
+                        </span>
+                    </template>
+                    <input x-ref="searchInput" type="text" x-model="query" @focus="open = true" @keydown.backspace="onBackspace($event)"
+                           class="flex-1 min-w-[80px] outline-none border-none p-0 text-sm bg-transparent" placeholder="Type to add...">
+                </div>
+                <!-- Dropdown -->
+                <div x-show="open" x-transition.opacity class="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    <template x-for="group in filteredGroups" :key="group.label">
+                        <div>
+                            <div class="px-3 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider bg-gray-50" x-text="group.label"></div>
+                            <template x-for="opt in group.items" :key="opt">
+                                <button type="button" @click="add(opt)"
+                                        class="w-full text-left px-3 py-1.5 text-sm hover:bg-navy/5 text-gray-700 flex items-center justify-between"
+                                        :class="selected.includes(opt) ? 'opacity-40 pointer-events-none' : ''">
+                                    <span x-text="opt"></span>
+                                    <span x-show="selected.includes(opt)" class="text-[10px] text-gray-400">added</span>
+                                </button>
+                            </template>
+                        </div>
+                    </template>
+                    <div x-show="filteredGroups.length === 0" class="px-3 py-2 text-xs text-gray-400">No matching locations</div>
+                </div>
             </div>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -95,6 +116,40 @@
 </div>
 
 <script>
+function locationPicker() {
+    const allOptions = [
+        { label: 'Cities', items: ['Melbourne', 'Sydney', 'Perth', 'Brisbane', 'Adelaide', 'Canberra'] },
+        { label: 'States', items: ['Western Australia', 'Victoria', 'New South Wales', 'Queensland'] },
+        { label: 'Countries', items: ['Australia', 'New Zealand'] },
+    ];
+    return {
+        selected: ['Australia'],
+        query: '',
+        open: false,
+        get filteredGroups() {
+            const q = this.query.toLowerCase();
+            if (!q) return allOptions;
+            return allOptions
+                .map(g => ({ label: g.label, items: g.items.filter(i => i.toLowerCase().includes(q)) }))
+                .filter(g => g.items.length > 0);
+        },
+        add(loc) {
+            if (!this.selected.includes(loc)) this.selected.push(loc);
+            this.query = '';
+            this.$refs.searchInput.focus();
+        },
+        remove(loc) {
+            this.selected = this.selected.filter(l => l !== loc);
+        },
+        onBackspace(e) {
+            if (!this.query && this.selected.length) {
+                e.preventDefault();
+                this.selected.pop();
+            }
+        }
+    };
+}
+
 // Load saved credentials from localStorage on page load
 (function() {
     const email = localStorage.getItem('li_email') || '';
