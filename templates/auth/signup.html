@@ -1,0 +1,69 @@
+{% extends "auth_base.html" %}
+
+{% block title %}Sign Up{% endblock %}
+{% block subtitle %}Create your account{% endblock %}
+
+{% block content %}
+{% if error %}
+<div class="mb-4 rounded-lg bg-red-50 border border-red-200 p-3">
+    <p class="text-sm text-red-700">{{ error }}</p>
+</div>
+{% endif %}
+
+<form method="POST" action="/signup" class="space-y-5">
+    <div>
+        <label for="full_name" class="block text-sm font-medium text-gray-700">Full name</label>
+        <input type="text" id="full_name" name="full_name" required autocomplete="name"
+               value="{{ full_name or '' }}"
+               class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm
+                      focus:border-navy focus:ring-1 focus:ring-navy focus:outline-none
+                      placeholder:text-gray-400"
+               placeholder="Jane Smith">
+    </div>
+
+    <div>
+        <label for="email" class="block text-sm font-medium text-gray-700">Email address</label>
+        <input type="email" id="email" name="email" required autocomplete="email"
+               value="{{ email or '' }}"
+               class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm
+                      focus:border-navy focus:ring-1 focus:ring-navy focus:outline-none
+                      placeholder:text-gray-400"
+               placeholder="you@example.com">
+    </div>
+
+    <div>
+        <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
+        <input type="password" id="password" name="password" required autocomplete="new-password"
+               minlength="8"
+               class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm
+                      focus:border-navy focus:ring-1 focus:ring-navy focus:outline-none
+                      placeholder:text-gray-400"
+               placeholder="Min. 8 characters">
+        <p class="mt-1 text-xs text-gray-400">Must be at least 8 characters</p>
+    </div>
+
+    <div>
+        <label for="password_confirm" class="block text-sm font-medium text-gray-700">Confirm password</label>
+        <input type="password" id="password_confirm" name="password_confirm" required autocomplete="new-password"
+               minlength="8"
+               class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm
+                      focus:border-navy focus:ring-1 focus:ring-navy focus:outline-none
+                      placeholder:text-gray-400"
+               placeholder="Repeat your password">
+    </div>
+
+    <button type="submit"
+            class="w-full rounded-lg bg-navy px-4 py-2.5 text-sm font-semibold text-white shadow-sm
+                   hover:bg-navy-light focus:outline-none focus:ring-2 focus:ring-navy focus:ring-offset-2
+                   transition-colors">
+        Create account
+    </button>
+</form>
+{% endblock %}
+
+{% block footer %}
+<p class="text-sm text-gray-500">
+    Already have an account?
+    <a href="/login" class="font-semibold text-navy hover:text-navy-light">Sign in</a>
+</p>
+{% endblock %}

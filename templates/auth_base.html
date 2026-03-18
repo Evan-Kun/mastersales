@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}MasterSales{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        navy: { DEFAULT: '#1e3a5f', light: '#2a4d7a', dark: '#152d4a' },
+                        amber: { DEFAULT: '#f39c12', light: '#f5b041' },
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="h-full">
+    <div class="min-h-full flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+        <!-- Logo -->
+        <div class="sm:mx-auto sm:w-full sm:max-w-md text-center">
+            <div class="mx-auto w-14 h-14 bg-navy rounded-xl flex items-center justify-center">
+                <svg class="w-8 h-8 text-amber" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                </svg>
+            </div>
+            <h1 class="mt-4 text-2xl font-bold text-navy">MasterSales</h1>
+            <p class="mt-1 text-sm text-gray-500">{% block subtitle %}{% endblock %}</p>
+        </div>
+
+        <!-- Card -->
+        <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+            <div class="bg-white py-8 px-6 shadow-lg rounded-xl sm:px-10 border border-gray-100">
+                {% block content %}{% endblock %}
+            </div>
+            <div class="mt-6 text-center">
+                {% block footer %}{% endblock %}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

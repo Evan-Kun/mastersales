@@ -12,9 +12,14 @@ from sqlalchemy import or_
 from config import settings
 from database.db import init_db, get_db, SessionLocal
 from database.models import (
-    Company, Contact, Meeting, Proposal, NurtureSequence, NurtureEnrollment,
+    Company, Contact, Meeting, Proposal, NurtureSequence, NurtureEnrollment, User,
 )
 from database.seed import seed_demo_data
+from auth import (
+    hash_password, verify_password, require_auth, get_current_user,
+    create_reset_token, verify_reset_token,
+    set_session_cookie, clear_session_cookie, _AuthRedirect,
+)
 
 
 @asynccontextmanager
@@ -39,6 +44,183 @@ logger = logging.getLogger("mastersales")
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
+
+
+# ── Auth middleware ────────────────────────────────────────────────────────────
+
+PUBLIC_PATHS = {"/login", "/signup", "/forgot-password", "/reset-password"}
+
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    path = request.url.path
+    # Allow static files and auth pages through
+    if path.startswith("/static") or path in PUBLIC_PATHS:
+        return await call_next(request)
+    # Check session cookie
+    from auth import read_session_cookie, SESSION_COOKIE
+    token = request.cookies.get(SESSION_COOKIE)
+    user_id = read_session_cookie(token) if token else None
+    if not user_id:
+        return RedirectResponse("/login", status_code=303)
+    # Store user_id on request state so templates can access it
+    request.state.user_id = user_id
+    return await call_next(request)
+
+
+@app.exception_handler(_AuthRedirect)
+async def auth_redirect_handler(request: Request, exc: _AuthRedirect):
+    return RedirectResponse("/login", status_code=303)
+
+
+# ── Auth routes ───────────────────────────────────────────────────────────────
+
+@app.get("/login", response_class=HTMLResponse)
+def login_page(request: Request, reset: str = ""):
+    ctx = {"request": request}
+    if reset == "success":
+        ctx["success"] = "Password reset successfully. Please sign in."
+    return templates.TemplateResponse("auth/login.html", ctx)
+
+
+@app.post("/login", response_class=HTMLResponse)
+def login_submit(
+    request: Request,
+    db: Session = Depends(get_db),
+    email: str = Form(...),
+    password: str = Form(...),
+):
+    user = db.query(User).filter(User.email == email.lower().strip()).first()
+    if not user or not verify_password(password, user.password_hash):
+        return templates.TemplateResponse("auth/login.html", {
+            "request": request,
+            "error": "Invalid email or password.",
+            "email": email,
+        })
+    if not user.is_active:
+        return templates.TemplateResponse("auth/login.html", {
+            "request": request,
+            "error": "This account has been deactivated.",
+            "email": email,
+        })
+    response = RedirectResponse("/", status_code=303)
+    return set_session_cookie(response, user.id)
+
+
+@app.get("/signup", response_class=HTMLResponse)
+def signup_page(request: Request):
+    return templates.TemplateResponse("auth/signup.html", {"request": request})
+
+
+@app.post("/signup", response_class=HTMLResponse)
+def signup_submit(
+    request: Request,
+    db: Session = Depends(get_db),
+    full_name: str = Form(...),
+    email: str = Form(...),
+    password: str = Form(...),
+    password_confirm: str = Form(...),
+):
+    email_clean = email.lower().strip()
+    ctx = {"request": request, "full_name": full_name, "email": email}
+
+    if len(password) < 8:
+        return templates.TemplateResponse("auth/signup.html", {
+            **ctx, "error": "Password must be at least 8 characters."})
+    if password != password_confirm:
+        return templates.TemplateResponse("auth/signup.html", {
+            **ctx, "error": "Passwords do not match."})
+    if db.query(User).filter(User.email == email_clean).first():
+        return templates.TemplateResponse("auth/signup.html", {
+            **ctx, "error": "An account with this email already exists."})
+
+    user = User(
+        email=email_clean,
+        full_name=full_name.strip(),
+        password_hash=hash_password(password),
+    )
+    db.add(user)
+    db.commit()
+
+    response = RedirectResponse("/", status_code=303)
+    return set_session_cookie(response, user.id)
+
+
+@app.get("/forgot-password", response_class=HTMLResponse)
+def forgot_password_page(request: Request):
+    return templates.TemplateResponse("auth/forgot_password.html", {"request": request})
+
+
+@app.post("/forgot-password", response_class=HTMLResponse)
+def forgot_password_submit(
+    request: Request,
+    db: Session = Depends(get_db),
+    email: str = Form(...),
+):
+    user = db.query(User).filter(User.email == email.lower().strip()).first()
+    if user:
+        token = create_reset_token(user.email)
+        reset_url = f"{request.base_url}reset-password?token={token}"
+        logger.info(f"AUTH: Password reset link for {user.email}: {reset_url}")
+    # Always show success to prevent email enumeration
+    return templates.TemplateResponse("auth/forgot_password.html", {
+        "request": request,
+        "success": "If an account with that email exists, a reset link has been sent. Check the server logs for the link.",
+    })
+
+
+@app.get("/reset-password", response_class=HTMLResponse)
+def reset_password_page(request: Request, token: str = ""):
+    if not token or not verify_reset_token(token):
+        return templates.TemplateResponse("auth/reset_password.html", {
+            "request": request, "invalid_token": True})
+    return templates.TemplateResponse("auth/reset_password.html", {
+        "request": request, "token": token})
+
+
+@app.post("/reset-password", response_class=HTMLResponse)
+def reset_password_submit(
+    request: Request,
+    db: Session = Depends(get_db),
+    token: str = Form(...),
+    password: str = Form(...),
+    password_confirm: str = Form(...),
+):
+    email = verify_reset_token(token)
+    if not email:
+        return templates.TemplateResponse("auth/reset_password.html", {
+            "request": request, "invalid_token": True})
+
+    if len(password) < 8:
+        return templates.TemplateResponse("auth/reset_password.html", {
+            "request": request, "token": token,
+            "error": "Password must be at least 8 characters."})
+    if password != password_confirm:
+        return templates.TemplateResponse("auth/reset_password.html", {
+            "request": request, "token": token,
+            "error": "Passwords do not match."})
+
+    user = db.query(User).filter(User.email == email).first()
+    if user:
+        user.password_hash = hash_password(password)
+        db.commit()
+
+    return RedirectResponse("/login?reset=success", status_code=303)
+
+
+@app.post("/logout")
+def logout():
+    response = RedirectResponse("/login", status_code=303)
+    return clear_session_cookie(response)
+
+
+# ── Helper: get current user for templates ────────────────────────────────────
+
+def _get_user(request: Request, db: Session) -> User | None:
+    user_id = getattr(request.state, "user_id", None)
+    if user_id:
+        return db.query(User).get(user_id)
+    return None
 
 
 # ── Dashboard ──────────────────────────────────────────────────────────────────
@@ -66,6 +248,7 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "settings": settings,
+        "user": _get_user(request, db),
         "total_leads": total_leads,
         "active_deals": active_deals,
         "proposals_sent": proposals_sent,
@@ -125,6 +308,7 @@ def leads_list(
     return templates.TemplateResponse("leads.html", {
         "request": request,
         "settings": settings,
+        "user": _get_user(request, db),
         "contacts": contacts,
         "statuses": statuses,
         "states": states,
@@ -150,6 +334,7 @@ def lead_detail(request: Request, contact_id: int, db: Session = Depends(get_db)
     return templates.TemplateResponse("lead_detail.html", {
         "request": request,
         "settings": settings,
+        "user": _get_user(request, db),
         "contact": contact,
         "meetings": meetings,
         "proposals": proposals,
@@ -220,6 +405,7 @@ def pipeline(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse("pipeline.html", {
         "request": request,
         "settings": settings,
+        "user": _get_user(request, db),
         "pipeline_data": pipeline_data,
         "pipeline_stats": pipeline_stats,
         "stages": PIPELINE_STAGES,
@@ -260,10 +446,11 @@ scraper_status: dict = {"running": False, "found": 0, "message": "Idle"}
 
 
 @app.get("/scraper", response_class=HTMLResponse)
-def scraper_page(request: Request):
+def scraper_page(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse("scraper.html", {
         "request": request,
         "settings": settings,
+        "user": _get_user(request, db),
         "scraper_status": scraper_status,
         "results": scraper_results,
     })
@@ -461,6 +648,7 @@ def scheduler_page(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse("scheduler.html", {
         "request": request,
         "settings": settings,
+        "user": _get_user(request, db),
         "upcoming": upcoming,
         "past": past,
         "contacts": contacts,
@@ -524,6 +712,7 @@ def nurture_page(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse("nurture.html", {
         "request": request,
         "settings": settings,
+        "user": _get_user(request, db),
         "sequences": sequences,
         "enrollments": enrollments,
         "contacts": contacts,
@@ -617,6 +806,7 @@ def proposals_page(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse("proposals.html", {
         "request": request,
         "settings": settings,
+        "user": _get_user(request, db),
         "proposals": proposals,
         "contacts": contacts,
         "products": settings.products,

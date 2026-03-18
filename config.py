@@ -4,6 +4,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     app_name: str = "MasterSales"
     database_url: str = "sqlite:///mastersales.db"
+    secret_key: str = "change-me-to-a-random-string"
     debug: bool = True
 
     # Corrizon company details
