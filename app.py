@@ -1,9 +1,11 @@
+import csv
+import io
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 
 from fastapi import FastAPI, Request, Depends, Form, Query, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -318,6 +320,43 @@ def leads_list(
         "sort": sort,
         "order": order,
     })
+
+
+@app.get("/leads/export")
+def leads_export(db: Session = Depends(get_db)):
+    contacts = db.query(Contact).join(Company, isouter=True).order_by(Contact.created_at.desc()).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "First Name", "Last Name", "Email (Work)", "Email (Personal)",
+        "Phone (Mobile)", "Phone (Work)", "Job Title", "Seniority",
+        "Company", "Industry", "City", "State", "Country",
+        "Status", "Lead Score", "Deal Value", "Source", "Assigned To",
+        "LinkedIn URL", "Notes", "Last Contacted", "Next Follow Up",
+        "Created At",
+    ])
+    for c in contacts:
+        company_name = c.company.company_name if c.company else ""
+        industry = c.company.company_industry if c.company else ""
+        writer.writerow([
+            c.first_name, c.last_name or "", c.email_work or "", c.email_personal or "",
+            c.phone_mobile or "", c.phone_work or "", c.job_title or "", c.seniority_level or "",
+            company_name, industry, c.location_city or "", c.location_state or "", c.location_country or "",
+            c.lead_status, c.lead_score or "", c.deal_value or "", c.lead_source or "", c.assigned_to or "",
+            c.linkedin_url or "", c.notes or "",
+            c.last_contacted.strftime("%Y-%m-%d") if c.last_contacted else "",
+            c.next_follow_up.strftime("%Y-%m-%d") if c.next_follow_up else "",
+            c.created_at.strftime("%Y-%m-%d %H:%M"),
+        ])
+
+    output.seek(0)
+    filename = f"leads-export-{datetime.utcnow().strftime('%Y%m%d')}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @app.get("/leads/{contact_id}", response_class=HTMLResponse)
