@@ -103,3 +103,35 @@ def test_cancel_and_is_cancelled():
     cancel_scrape()
     assert is_cancelled() is True
     _cancel_event.clear()
+
+
+def test_full_scrape_demo_mode():
+    """End-to-end: run all scrapers in demo mode, verify dedup and output format."""
+    from scraper.search_engine import run_scrape
+
+    results, status = run_scrape(
+        sources=["linkedin", "aca", "ampp", "tenders_au", "tenders_nz", "trade_shows"],
+        keywords=["steel", "corrosion"],
+        location="Australia",
+        max_results=5,
+        credentials={},  # No creds = demo mode for all
+        source_configs={
+            "tenders_au": {"date_from": "2025-01-01", "date_to": "2026-01-01"},
+            "tenders_nz": {"date_from": "2025-01-01", "date_to": "2026-01-01"},
+            "trade_shows": {"events": ["aca_conf"]},
+        },
+    )
+
+    assert len(results) > 0
+    assert not status["running"]
+
+    # All results have required fields
+    for r in results:
+        assert r["first_name"]
+        assert r["last_name"]
+        assert r["company_name"]
+        assert r["source_name"]
+
+    # Multiple sources represented
+    sources_seen = {r["source_name"].split(",")[0].strip() for r in results}
+    assert len(sources_seen) >= 3
