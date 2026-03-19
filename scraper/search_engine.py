@@ -248,6 +248,11 @@ def run_scrape(
                 results = scraper.generate_demo_results(config)
             else:
                 results = scraper.scrape(config)
+                # Fall back to demo if scrape returned nothing
+                # (e.g. Playwright can't reach the site)
+                if not results and not has_creds:
+                    logger.info("[%s] Scrape returned 0 results — falling back to demo", slug)
+                    results = scraper.generate_demo_results(config)
 
             with _lock:
                 all_results.extend(results)
