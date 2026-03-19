@@ -47,3 +47,36 @@ def test_linkedin_demo_results():
     assert all(r["source_name"] == "LinkedIn" for r in results)
     assert all(r["first_name"] and r["last_name"] for r in results)
     assert all(r["company_name"] for r in results)
+
+
+def test_nz_tenders_scraper_interface():
+    from scraper.tenders_nz import GETSScraper
+    from scraper.base import BaseScraper
+    scraper = GETSScraper()
+    assert isinstance(scraper, BaseScraper)
+    assert scraper.slug == "tenders_nz"
+    assert scraper.requires_auth is False
+
+def test_nz_tenders_demo_results():
+    from scraper.tenders_nz import GETSScraper
+    results = GETSScraper().generate_demo_results({"keywords": ["steel"], "max_results": 5})
+    assert len(results) == 5
+    assert all(r["source_name"] == "GETS" for r in results)
+    assert all(r["location_country"] == "NZ" for r in results)
+
+
+def test_trade_shows_scraper_interface():
+    from scraper.trade_shows import TradeShowScraper
+    from scraper.base import BaseScraper
+    scraper = TradeShowScraper()
+    assert isinstance(scraper, BaseScraper)
+    assert scraper.slug == "trade_shows"
+    assert scraper.uses_browser is True
+
+def test_trade_shows_demo_with_events():
+    from scraper.trade_shows import TradeShowScraper, HARDCODED_EVENTS
+    results = TradeShowScraper().generate_demo_results({"keywords": ["steel"], "max_results": 5})
+    assert len(results) == 5
+    assert all("Trade Show" in r["source_name"] for r in results)
+    assert "aca_conf" in HARDCODED_EVENTS
+    assert "austmine" in HARDCODED_EVENTS
