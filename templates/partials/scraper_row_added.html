@@ -8,6 +8,9 @@
     <td class="px-4 py-3 text-sm text-gray-400">{{ company }}</td>
     <td class="px-4 py-3 text-sm text-gray-400">{{ location }}</td>
     <td class="px-4 py-3">
+        <span class="px-2 py-0.5 rounded text-xs font-medium {{ source_badge_css }}">{{ source_name[:12] }}</span>
+    </td>
+    <td class="px-4 py-3">
         {% if status == 'duplicate' %}
         <span class="px-3 py-1 bg-amber-200 text-amber-800 rounded text-xs font-medium">Already exists</span>
         {% else %}
