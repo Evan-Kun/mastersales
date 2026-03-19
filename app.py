@@ -255,6 +255,18 @@ def _active_contacts(db: Session):
     return db.query(Contact).filter(Contact.deleted_at.is_(None))
 
 
+# ── Users ──────────────────────────────────────────────────────────────────────
+
+@app.get("/users", response_class=HTMLResponse)
+def users_list(request: Request, db: Session = Depends(get_db)):
+    user = _get_user(request, db)
+    all_users = db.query(User).order_by(User.created_at.desc()).all()
+    return templates.TemplateResponse("users.html", {
+        "request": request, "settings": settings, "user": user,
+        "users": all_users,
+    })
+
+
 # ── Dashboard ──────────────────────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
