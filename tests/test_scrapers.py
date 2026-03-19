@@ -80,3 +80,21 @@ def test_trade_shows_demo_with_events():
     assert all("Trade Show" in r["source_name"] for r in results)
     assert "aca_conf" in HARDCODED_EVENTS
     assert "austmine" in HARDCODED_EVENTS
+
+
+def test_au_tenders_scraper_interface():
+    from scraper.tenders_au import AusTenderScraper
+    scraper = AusTenderScraper()
+    assert isinstance(scraper, BaseScraper)
+    assert scraper.slug == "tenders_au"
+    assert scraper.requires_auth is False
+    assert scraper.uses_browser is True
+
+
+def test_au_tenders_demo_results():
+    from scraper.tenders_au import AusTenderScraper
+    results = AusTenderScraper().generate_demo_results({
+        "keywords": ["steel"], "max_results": 5,
+    })
+    assert len(results) == 5
+    assert all(r["source_name"] == "AusTender" for r in results)
