@@ -1,3 +1,6 @@
+/* Hide Alpine.js elements until initialized — prevents flash of content */
+[x-cloak] { display: none !important; }
+
 /* MasterSales Custom Styles - Corrizon Branding */
 :root {
     --corrizon-navy: #1e3a5f;

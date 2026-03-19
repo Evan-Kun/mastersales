@@ -322,34 +322,37 @@ def leads_list(
     })
 
 
-@app.get("/leads/export")
-def leads_export(db: Session = Depends(get_db)):
-    contacts = db.query(Contact).join(Company, isouter=True).order_by(Contact.created_at.desc()).all()
+CSV_COLUMNS = [
+    "First Name", "Last Name", "Email (Work)", "Email (Personal)",
+    "Phone (Mobile)", "Phone (Work)", "Job Title", "Seniority",
+    "Company", "Industry", "City", "State", "Country",
+    "Status", "Lead Score", "Deal Value", "Source", "Assigned To",
+    "LinkedIn URL", "Notes", "Last Contacted", "Next Follow Up",
+    "Created At",
+]
 
+
+def _contact_to_csv_row(c):
+    company_name = c.company.company_name if c.company else ""
+    industry = c.company.company_industry if c.company else ""
+    return [
+        c.first_name, c.last_name or "", c.email_work or "", c.email_personal or "",
+        c.phone_mobile or "", c.phone_work or "", c.job_title or "", c.seniority_level or "",
+        company_name, industry, c.location_city or "", c.location_state or "", c.location_country or "",
+        c.lead_status, c.lead_score or "", c.deal_value or "", c.lead_source or "", c.assigned_to or "",
+        c.linkedin_url or "", c.notes or "",
+        c.last_contacted.strftime("%Y-%m-%d") if c.last_contacted else "",
+        c.next_follow_up.strftime("%Y-%m-%d") if c.next_follow_up else "",
+        c.created_at.strftime("%Y-%m-%d %H:%M"),
+    ]
+
+
+def _export_contacts_csv(contacts):
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow([
-        "First Name", "Last Name", "Email (Work)", "Email (Personal)",
-        "Phone (Mobile)", "Phone (Work)", "Job Title", "Seniority",
-        "Company", "Industry", "City", "State", "Country",
-        "Status", "Lead Score", "Deal Value", "Source", "Assigned To",
-        "LinkedIn URL", "Notes", "Last Contacted", "Next Follow Up",
-        "Created At",
-    ])
+    writer.writerow(CSV_COLUMNS)
     for c in contacts:
-        company_name = c.company.company_name if c.company else ""
-        industry = c.company.company_industry if c.company else ""
-        writer.writerow([
-            c.first_name, c.last_name or "", c.email_work or "", c.email_personal or "",
-            c.phone_mobile or "", c.phone_work or "", c.job_title or "", c.seniority_level or "",
-            company_name, industry, c.location_city or "", c.location_state or "", c.location_country or "",
-            c.lead_status, c.lead_score or "", c.deal_value or "", c.lead_source or "", c.assigned_to or "",
-            c.linkedin_url or "", c.notes or "",
-            c.last_contacted.strftime("%Y-%m-%d") if c.last_contacted else "",
-            c.next_follow_up.strftime("%Y-%m-%d") if c.next_follow_up else "",
-            c.created_at.strftime("%Y-%m-%d %H:%M"),
-        ])
-
+        writer.writerow(_contact_to_csv_row(c))
     output.seek(0)
     filename = f"leads-export-{datetime.utcnow().strftime('%Y%m%d')}.csv"
     return StreamingResponse(
@@ -357,6 +360,42 @@ def leads_export(db: Session = Depends(get_db)):
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@app.get("/leads/export")
+def leads_export(db: Session = Depends(get_db)):
+    contacts = db.query(Contact).join(Company, isouter=True).order_by(Contact.created_at.desc()).all()
+    return _export_contacts_csv(contacts)
+
+
+@app.post("/leads/export-selected")
+def leads_export_selected(db: Session = Depends(get_db), ids: list[int] = Form(...)):
+    contacts = db.query(Contact).join(Company, isouter=True).filter(Contact.id.in_(ids)).all()
+    return _export_contacts_csv(contacts)
+
+
+@app.post("/leads/delete-selected")
+def leads_delete_selected(db: Session = Depends(get_db), ids: list[int] = Form(...)):
+    # Delete related records first, then contacts
+    db.query(Meeting).filter(Meeting.contact_id.in_(ids)).delete(synchronize_session=False)
+    db.query(NurtureEnrollment).filter(NurtureEnrollment.contact_id.in_(ids)).delete(synchronize_session=False)
+    db.query(Proposal).filter(Proposal.contact_id.in_(ids)).delete(synchronize_session=False)
+    db.query(Contact).filter(Contact.id.in_(ids)).delete(synchronize_session=False)
+    db.commit()
+    return RedirectResponse("/leads", status_code=303)
+
+
+@app.post("/leads/{contact_id}/delete")
+def lead_delete(contact_id: int, db: Session = Depends(get_db)):
+    contact = db.query(Contact).get(contact_id)
+    if not contact:
+        raise HTTPException(status_code=404)
+    db.query(Meeting).filter(Meeting.contact_id == contact_id).delete()
+    db.query(NurtureEnrollment).filter(NurtureEnrollment.contact_id == contact_id).delete()
+    db.query(Proposal).filter(Proposal.contact_id == contact_id).delete()
+    db.delete(contact)
+    db.commit()
+    return RedirectResponse("/leads", status_code=303)
 
 
 @app.get("/leads/{contact_id}", response_class=HTMLResponse)
