@@ -5,8 +5,12 @@ import random
 import logging
 import os
 from urllib.parse import quote_plus
-from playwright.sync_api import sync_playwright
+try:
+    from playwright.sync_api import sync_playwright
+except ImportError:
+    sync_playwright = None
 from config import settings
+from scraper.base import BaseScraper, ScraperConfig, ScraperResult
 
 logger = logging.getLogger("mastersales.scraper")
 
@@ -107,10 +111,19 @@ def _build_geo_param(location: str) -> str:
     return f"&geoUrn={urn_list}"
 
 
-class LinkedInScraper:
+class LinkedInScraper(BaseScraper):
     """Playwright-based LinkedIn scraper using network interception."""
 
-    def __init__(self, email: str, password: str):
+    name = "LinkedIn"
+    slug = "linkedin"
+    requires_auth = True
+    uses_browser = True
+    credential_fields = [
+        {"key": "email", "label": "LinkedIn Email", "type": "email"},
+        {"key": "password", "label": "LinkedIn Password", "type": "password"},
+    ]
+
+    def __init__(self, email: str = "", password: str = ""):
         self.email = email
         self.password = password
         self.browser = None
@@ -855,3 +868,54 @@ class LinkedInScraper:
             logger.info(f"  Full page HTML saved: {html_path}")
         except Exception as e:
             logger.warning(f"  Debug dump failed: {e}")
+
+    # ---- BaseScraper interface ----
+
+    def scrape(self, config: ScraperConfig) -> list[ScraperResult]:
+        creds = config.get("credentials", {})
+        email = creds.get("email", "")
+        password = creds.get("password", "")
+        if not email or not password:
+            return self.generate_demo_results(config)
+        self.email = email
+        self.password = password
+        raw_results = self.search_people(
+            config.get("keywords", []),
+            config.get("location", "Australia"),
+            config.get("max_results", 20),
+        )
+        return [
+            {
+                "first_name": r.get("first_name", ""),
+                "last_name": r.get("last_name", ""),
+                "job_title": r.get("job_title"),
+                "company_name": r.get("company_name", "Unknown"),
+                "company_domain": None,
+                "linkedin_url": r.get("linkedin_url"),
+                "location_city": r.get("location_city"),
+                "location_state": r.get("location_state"),
+                "location_country": r.get("location_country"),
+                "source_url": r.get("linkedin_url"),
+                "source_name": "LinkedIn",
+            }
+            for r in raw_results
+        ]
+
+    def generate_demo_results(self, config: ScraperConfig) -> list[ScraperResult]:
+        from scraper.search_engine import generate_demo_data
+        titles = [
+            "Steel Fabrication Manager", "Corrosion Engineer", "Maintenance Director",
+            "Procurement Specialist", "Quality Control Manager", "Site Engineer",
+            "Materials Engineer", "Plant Manager", "Operations Manager",
+        ]
+        results = generate_demo_data(
+            keywords=config.get("keywords", []),
+            max_results=config.get("max_results", 20),
+            source_name="LinkedIn",
+            job_titles=titles,
+            source_url_base="https://linkedin.com/in",
+        )
+        for r in results:
+            slug = f"{r['first_name'].lower()}-{r['last_name'].lower()}-demo"
+            r["linkedin_url"] = f"https://linkedin.com/in/{slug}"
+        return results
