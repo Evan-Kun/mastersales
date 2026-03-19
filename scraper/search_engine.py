@@ -8,7 +8,7 @@ logger = logging.getLogger("mastersales.scraper")
 SCRAPERS: dict[str, type[BaseScraper]] = {}
 _lock = threading.Lock()
 _cancel_event = threading.Event()
-_browser_semaphore = threading.Semaphore(2)
+_browser_semaphore = threading.Semaphore(5)
 
 
 # ---------------------------------------------------------------------------
