@@ -27,8 +27,8 @@ class GETSScraper(BaseScraper):
         try:
             from playwright.sync_api import sync_playwright
         except ImportError:
-            logger.warning("[GETS] Playwright not installed — demo mode")
-            return self.generate_demo_results(config)
+            logger.warning("[GETS] Playwright not installed — cannot scrape")
+            return []
 
         try:
             with sync_playwright() as p:

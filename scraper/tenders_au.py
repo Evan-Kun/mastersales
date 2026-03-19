@@ -58,8 +58,8 @@ class AusTenderScraper(BaseScraper):
         try:
             from playwright.sync_api import sync_playwright
         except ImportError:
-            logger.warning("[AU Tenders] Playwright not installed — demo mode")
-            return self.generate_demo_results(config)
+            logger.warning("[AU Tenders] Playwright not installed — cannot scrape")
+            return []
 
         try:
             with sync_playwright() as p:

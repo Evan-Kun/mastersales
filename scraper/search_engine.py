@@ -259,8 +259,7 @@ def run_scrape(
         except Exception as e:
             logger.exception("Scraper %s failed: %s", slug, e)
             with _lock:
-                with _lock:
-                    status["sources"][slug] = {"status": "error", "found": 0}
+                status["sources"][slug] = {"status": "error", "found": 0}
         finally:
             if acquired:
                 _browser_semaphore.release()

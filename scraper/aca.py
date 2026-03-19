@@ -99,8 +99,8 @@ class ACAScraper(BaseScraper):
         try:
             from playwright.sync_api import sync_playwright
         except ImportError:
-            logger.warning("[ACA] Playwright not installed — demo mode")
-            return self.generate_demo_results(config)
+            logger.warning("[ACA] Playwright not installed — cannot scrape")
+            return []
         try:
             with sync_playwright() as p:
                 browser = p.chromium.launch(headless=True)
@@ -145,10 +145,6 @@ class ACAScraper(BaseScraper):
                 browser.close()
         except Exception as e:
             logger.error(f"[ACA] Scraper error: {e}")
-
-        if not results:
-            logger.info("[ACA] No live results — falling back to demo data")
-            return self.generate_demo_results(config)
 
         return results[:max_results]
 

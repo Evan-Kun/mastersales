@@ -124,19 +124,19 @@ class AMPPScraper(BaseScraper):
         try:
             from playwright.sync_api import sync_playwright
         except ImportError:
-            logger.warning("[AMPP] Playwright not installed — demo mode")
-            return self.generate_demo_results(config)
+            logger.warning("[AMPP] Playwright not installed — cannot scrape")
+            return []
         try:
             with sync_playwright() as p:
                 browser = p.chromium.launch(headless=True)
                 page = browser.new_page()
 
                 # Navigate to the public corporate directory
-                page.goto(DIRECTORY_URL, timeout=30000)
-                page.wait_for_load_state("networkidle", timeout=15000)
+                page.goto(DIRECTORY_URL, timeout=60000)
+                page.wait_for_load_state("domcontentloaded", timeout=30000)
 
                 # Wait for the table to appear
-                page.wait_for_selector("table", timeout=15000)
+                page.wait_for_selector("table", timeout=30000)
 
                 page_num = 0
                 while len(results) < max_results:
@@ -164,7 +164,8 @@ class AMPPScraper(BaseScraper):
         except Exception as e:
             logger.error(f"[AMPP] Scraper error: {e}")
             if not results:
-                return self.generate_demo_results(config)
+                logger.warning("[AMPP] Scraper failed — no results")
+
 
         return results[:max_results]
 
