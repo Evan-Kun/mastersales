@@ -1,80 +1,21 @@
+import logging
 import time
 import random
-import logging
-from urllib.parse import quote_plus
-from config import settings
+import threading
+from scraper.base import BaseScraper, ScraperConfig, ScraperResult
 
 logger = logging.getLogger("mastersales.scraper")
+SCRAPERS: dict[str, type[BaseScraper]] = {}
+_lock = threading.Lock()
+_cancel_event = threading.Event()
+_browser_semaphore = threading.Semaphore(2)
 
 
-def build_linkedin_search_url(keywords: list[str], location: str = "Australia") -> str:
-    keyword_str = " ".join(keywords)
-    return f"https://www.linkedin.com/search/results/people/?keywords={quote_plus(keyword_str)}&origin=GLOBAL_SEARCH_HEADER&geoUrn={quote_plus(location)}"
+# ---------------------------------------------------------------------------
+# Demo data
+# ---------------------------------------------------------------------------
 
-
-def parse_icp_to_search_params(
-    keywords: list[str],
-    countries: list[str] = None,
-    states: list[str] = None,
-) -> dict:
-    location_parts = []
-    if states:
-        location_parts.extend(states)
-    if countries:
-        location_parts.extend(countries)
-    location = ", ".join(location_parts) if location_parts else "Australia"
-
-    return {
-        "keywords": " ".join(keywords),
-        "location": location,
-    }
-
-
-def run_scrape(
-    keywords: list[str],
-    location: str = "Australia",
-    max_results: int = 20,
-    linkedin_email: str = "",
-    linkedin_password: str = "",
-) -> list[dict]:
-    """Run the LinkedIn scrape. Uses Playwright if credentials available, otherwise returns demo data.
-
-    Args:
-        linkedin_email: Override credentials (from web UI). Falls back to global .env config.
-        linkedin_password: Override credentials (from web UI). Falls back to global .env config.
-    """
-    # Use provided credentials, fall back to global config
-    email = linkedin_email or settings.linkedin_email
-    password = linkedin_password or settings.linkedin_password
-
-    logger.info("=" * 50)
-    logger.info("SCRAPE JOB STARTED")
-    logger.info(f"  Keywords: {keywords}")
-    logger.info(f"  Location: {location}")
-    logger.info(f"  Max results: {max_results}")
-    logger.info(f"  LinkedIn credentials: {'configured' if email else 'NOT SET (demo mode)'}")
-    logger.info(f"  Credential source: {'web UI' if linkedin_email else '.env config' if email else 'none'}")
-    logger.info("=" * 50)
-
-    if email and password:
-        try:
-            from scraper.linkedin import LinkedInScraper
-        except ImportError:
-            logger.warning("MODE: Playwright not installed — falling back to demo data")
-            logger.warning("  Live LinkedIn scraping requires: pip install playwright && playwright install chromium")
-            return _generate_demo_results(keywords, location, max_results)
-
-        logger.info("MODE: Live LinkedIn scraping")
-        scraper = LinkedInScraper(email, password)
-        results = scraper.search_people(keywords, location, max_results)
-        logger.info(f"SCRAPE JOB COMPLETE: {len(results)} leads found via LinkedIn")
-        return results
-    else:
-        logger.info("MODE: Demo data (no LinkedIn credentials)")
-        return _generate_demo_results(keywords, location, max_results)
-
-
-_FIRST_NAMES = [
+DEMO_FIRST_NAMES = [
     "Michael", "Jennifer", "Robert", "Tane", "Karen", "Steven", "Linda", "Rawiri",
     "Craig", "Priya", "Daniel", "Grace", "Wayne", "Sophie", "Ian", "David",
     "Sarah", "James", "Emily", "Mark", "Aroha", "Peter", "Megan", "Hemi",
@@ -85,7 +26,7 @@ _FIRST_NAMES = [
     "Colin", "Vanessa", "Ethan", "Sonia",
 ]
 
-_LAST_NAMES = [
+DEMO_LAST_NAMES = [
     "Anderson", "Walsh", "Hughes", "Wiremu", "Mitchell", "Park", "Foster", "Henare",
     "McDonald", "Sharma", "O'Sullivan", "Lee", "Barrett", "Turner", "Campbell", "Clarke",
     "Richards", "Patel", "Thompson", "Cooper", "Singh", "Jenkins", "Harris", "Taylor",
@@ -96,25 +37,7 @@ _LAST_NAMES = [
     "Stone", "Fox", "Blair", "Cole",
 ]
 
-_JOB_TITLES = [
-    "Steel Fabrication Manager", "Corrosion Engineer", "Maintenance Director",
-    "Shipyard Operations Manager", "Procurement Specialist - Coatings",
-    "Quality Control Manager", "Site Engineer", "Workshop Foreman",
-    "Rust Prevention Specialist", "Materials Engineer", "Fabrication Supervisor",
-    "Protective Coatings Inspector", "Plant Manager", "Supply Chain Manager",
-    "Underground Mining Engineer", "Structural Engineer", "Asset Integrity Manager",
-    "Project Engineer - Steel Structures", "Surface Preparation Supervisor",
-    "Welding Inspector", "Operations Manager", "Workshop Manager",
-    "Coating Application Technician", "Safety & Compliance Manager",
-    "Procurement Manager - Industrial Coatings", "Production Supervisor",
-    "Mining Operations Engineer", "Civil & Structural Lead", "Fleet Maintenance Manager",
-    "Infrastructure Project Manager", "HSE Manager", "Marine Coatings Specialist",
-    "Blast & Paint Supervisor", "Reliability Engineer", "Warehouse & Logistics Manager",
-    "Technical Sales Manager - Coatings", "Workshop Superintendent",
-    "Pipeline Integrity Engineer", "Contracts Manager", "Plant Maintenance Planner",
-]
-
-_COMPANIES = [
+DEMO_COMPANIES = [
     ("Precision Steel WA", "Perth", "WA", "AU"),
     ("AusCoat Solutions", "Melbourne", "VIC", "AU"),
     ("Iron Range Mining", "Kalgoorlie", "WA", "AU"),
@@ -147,48 +70,230 @@ _COMPANIES = [
     ("Valmec Engineering", "Welshpool", "WA", "AU"),
 ]
 
+DEMO_JOB_TITLES = [
+    "Steel Fabrication Manager", "Corrosion Engineer", "Maintenance Director",
+    "Shipyard Operations Manager", "Procurement Specialist - Coatings",
+    "Quality Control Manager", "Site Engineer", "Workshop Foreman",
+    "Rust Prevention Specialist", "Materials Engineer", "Fabrication Supervisor",
+    "Protective Coatings Inspector", "Plant Manager", "Supply Chain Manager",
+    "Underground Mining Engineer", "Structural Engineer", "Asset Integrity Manager",
+    "Project Engineer - Steel Structures", "Surface Preparation Supervisor",
+    "Welding Inspector", "Operations Manager", "Workshop Manager",
+    "Coating Application Technician", "Safety & Compliance Manager",
+    "Procurement Manager - Industrial Coatings", "Production Supervisor",
+    "Mining Operations Engineer", "Civil & Structural Lead", "Fleet Maintenance Manager",
+    "Infrastructure Project Manager", "HSE Manager", "Marine Coatings Specialist",
+    "Blast & Paint Supervisor", "Reliability Engineer", "Warehouse & Logistics Manager",
+    "Technical Sales Manager - Coatings", "Workshop Superintendent",
+    "Pipeline Integrity Engineer", "Contracts Manager", "Plant Maintenance Planner",
+]
 
-def _generate_demo_results(keywords: list[str], location: str, max_results: int) -> list[dict]:
-    """Generate realistic demo scraping results for any requested count."""
 
-    logger.info(f"Generating {max_results} demo results...")
-
-    # Use a seeded RNG so the same keywords produce consistent results
-    seed = hash(tuple(sorted(keywords))) & 0xFFFFFFFF
+def generate_demo_data(
+    keywords: list[str],
+    max_results: int,
+    source_name: str,
+    job_titles: list[str] | None = None,
+    source_url_base: str = "https://example.com",
+) -> list[ScraperResult]:
+    """Generate realistic demo scraping results. Shared by all scrapers."""
+    seed = hash(tuple(sorted(keywords)) + (source_name,)) & 0xFFFFFFFF
     rng = random.Random(seed)
 
-    results = []
-    used_names = set()
+    titles = job_titles or DEMO_JOB_TITLES
+    results: list[ScraperResult] = []
+    used_names: set[tuple[str, str]] = set()
 
     for _ in range(max_results):
-        # Pick a unique first+last combo
         for _attempt in range(50):
-            first = rng.choice(_FIRST_NAMES)
-            last = rng.choice(_LAST_NAMES)
+            first = rng.choice(DEMO_FIRST_NAMES)
+            last = rng.choice(DEMO_LAST_NAMES)
             if (first, last) not in used_names:
                 used_names.add((first, last))
                 break
 
-        title = rng.choice(_JOB_TITLES)
-        company, city, state, country = rng.choice(_COMPANIES)
-        slug = f"{first.lower()}-{last.lower().replace(chr(39), '')}-{rng.randint(100,999)}"
+        title = rng.choice(titles)
+        company, city, state, country = rng.choice(DEMO_COMPANIES)
+        slug = f"{first.lower()}-{last.lower().replace(chr(39), '')}-{rng.randint(100, 999)}"
 
         results.append({
             "first_name": first,
             "last_name": last,
             "job_title": title,
             "company_name": company,
+            "company_domain": None,
+            "linkedin_url": None,
             "location_city": city,
             "location_state": state,
             "location_country": country,
-            "linkedin_url": f"https://linkedin.com/in/{slug}",
+            "source_url": f"{source_url_base}/{slug}",
+            "source_name": source_name,
         })
 
-    # Simulate scraping delay with logging
-    for i, result in enumerate(results):
-        delay = rng.uniform(0.05, 0.15)
-        time.sleep(delay)
-        logger.info(f"  [DEMO {i+1}/{len(results)}] {result['first_name']} {result['last_name']} - {result['job_title']}")
-
-    logger.info(f"Demo scrape complete: {len(results)} leads generated")
     return results
+
+
+# ---------------------------------------------------------------------------
+# Deduplication
+# ---------------------------------------------------------------------------
+
+def _dedup_key(r: dict) -> str:
+    return f"{r['first_name'].lower().strip()}|{r['last_name'].lower().strip()}|{r['company_name'].lower().strip()}"
+
+
+def _richness(r: dict) -> int:
+    """Count non-None optional fields."""
+    optional = [
+        "job_title", "company_domain", "linkedin_url",
+        "location_city", "location_state", "location_country", "source_url",
+    ]
+    return sum(1 for f in optional if r.get(f) is not None)
+
+
+def dedup_results(results: list[dict]) -> list[dict]:
+    """Cross-source dedup: keep richer record, combine source_names."""
+    seen: dict[str, dict] = {}
+    for r in results:
+        key = _dedup_key(r)
+        if key in seen:
+            existing = seen[key]
+            # Combine source names
+            existing_sources = set(existing["source_name"].split(", "))
+            new_sources = set(r["source_name"].split(", "))
+            combined_sources = existing_sources | new_sources
+
+            # Keep the richer record
+            if _richness(r) > _richness(existing):
+                r["source_name"] = ", ".join(sorted(combined_sources))
+                seen[key] = r
+            else:
+                existing["source_name"] = ", ".join(sorted(combined_sources))
+        else:
+            seen[key] = r
+    return list(seen.values())
+
+
+# ---------------------------------------------------------------------------
+# Orchestrator
+# ---------------------------------------------------------------------------
+
+def cancel_scrape() -> None:
+    """Signal all running scrapers to stop."""
+    _cancel_event.set()
+
+
+def is_cancelled() -> bool:
+    """Check whether a cancellation has been requested."""
+    return _cancel_event.is_set()
+
+
+def run_scrape(
+    sources: list[str],
+    keywords: list[str],
+    location: str = "Australia",
+    max_results: int = 20,
+    credentials: dict | None = None,
+    source_configs: dict | None = None,
+) -> tuple[list[ScraperResult], dict]:
+    """Run scrape across multiple sources in parallel.
+
+    Returns (deduped_results, status_dict).
+    """
+    credentials = credentials or {}
+    source_configs = source_configs or {}
+    _cancel_event.clear()
+
+    status: dict = {
+        "running": True,
+        "sources": {},
+        "total_found": 0,
+    }
+
+    all_results: list[dict] = []
+
+    def _run_source(slug: str) -> None:
+        scraper_cls = SCRAPERS.get(slug)
+        if scraper_cls is None:
+            with _lock:
+                status["sources"][slug] = {"status": "error", "found": 0}
+            return
+
+        scraper = scraper_cls()
+
+        config: ScraperConfig = {
+            "keywords": keywords,
+            "location": location,
+            "max_results": max_results,
+            **(source_configs.get(slug) or {}),
+        }
+
+        # If auth required but no creds, use demo results
+        needs_auth = scraper.requires_auth
+        has_creds = bool(credentials.get(slug))
+        if needs_auth and not has_creds:
+            config["credentials"] = {}
+        else:
+            config["credentials"] = credentials.get(slug, {})
+
+        with _lock:
+            status["sources"][slug] = {"status": "running", "found": 0}
+
+        acquired = False
+        try:
+            if scraper.uses_browser:
+                _browser_semaphore.acquire()
+                acquired = True
+
+            if needs_auth and not has_creds:
+                results = scraper.generate_demo_results(config)
+            else:
+                results = scraper.scrape(config)
+
+            with _lock:
+                all_results.extend(results)
+                status["sources"][slug] = {"status": "complete", "found": len(results)}
+                status["total_found"] = sum(
+                    s["found"] for s in status["sources"].values()
+                )
+        except Exception as e:
+            logger.exception("Scraper %s failed: %s", slug, e)
+            with _lock:
+                status["sources"][slug] = {"status": "error", "found": 0}
+        finally:
+            if acquired:
+                _browser_semaphore.release()
+
+    threads: list[threading.Thread] = []
+    for slug in sources:
+        t = threading.Thread(target=_run_source, args=(slug,), daemon=True)
+        threads.append(t)
+        t.start()
+
+    for t in threads:
+        t.join()
+
+    deduped = dedup_results(all_results)
+
+    with _lock:
+        status["running"] = False
+        status["total_found"] = len(deduped)
+
+    return deduped, status
+
+
+# ---------------------------------------------------------------------------
+# Scraper registration (called in Task 10 after all scrapers exist)
+# ---------------------------------------------------------------------------
+
+def _register_scrapers():
+    global SCRAPERS
+    from scraper.linkedin import LinkedInScraper
+    from scraper.aca import ACAScraper
+    from scraper.ampp import AMPPScraper
+    from scraper.tenders_au import AusTenderScraper
+    from scraper.tenders_nz import GETSScraper
+    from scraper.trade_shows import TradeShowScraper
+    SCRAPERS = {
+        "linkedin": LinkedInScraper, "aca": ACAScraper, "ampp": AMPPScraper,
+        "tenders_au": AusTenderScraper, "tenders_nz": GETSScraper, "trade_shows": TradeShowScraper,
+    }
