@@ -9,15 +9,11 @@
         <h2 class="text-2xl font-bold text-gray-900">Leads</h2>
         <p class="text-sm text-gray-500 mt-1">{{ contacts | length }} contacts in database</p>
     </div>
-    <div class="flex gap-3">
-        <a href="/leads/export" class="px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-2">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-            Export All
-        </a>
-        <a href="/scraper" class="px-4 py-2 bg-navy text-white rounded-lg text-sm font-medium hover:bg-navy-light transition-colors">
-            + Source New Leads
-        </a>
-    </div>
+    <a href="/scraper"
+       class="px-4 py-2.5 bg-navy text-white rounded-lg text-sm font-medium hover:bg-navy-light transition-colors flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        Source New Leads
+    </a>
 </div>
 
 <!-- Bulk Action Bar — sticky so it stays visible while scrolling -->
@@ -115,35 +111,51 @@
     </div>
 </div>
 
-<!-- Filters -->
+<!-- Toolbar: Search, Filters, Actions -->
 <div class="bg-white rounded-xl shadow-sm p-4 mb-6 border border-gray-100">
-    <form class="flex flex-wrap gap-4 items-end" action="/leads" method="get">
-        <div class="flex-1 min-w-[200px]">
-            <label class="block text-xs font-medium text-gray-500 mb-1">Search</label>
-            <input type="text" name="q" value="{{ q }}" placeholder="Name, company, title, email..."
-                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy focus:border-navy"
-                   hx-get="/leads" hx-trigger="keyup changed delay:300ms" hx-target="#leads-table-body" hx-include="[name='status'],[name='state']">
+    <div class="flex flex-wrap gap-4 items-end">
+        <!-- Search + Filters (form) -->
+        <form class="flex flex-wrap gap-4 items-end flex-1 min-w-0" action="/leads" method="get">
+            <div class="flex-1 min-w-[180px]">
+                <label class="block text-xs font-medium text-gray-500 mb-1">Search</label>
+                <input type="text" name="q" value="{{ q }}" placeholder="Name, company, title, email..."
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy focus:border-navy"
+                       hx-get="/leads" hx-trigger="keyup changed delay:300ms" hx-target="#leads-table-body" hx-include="[name='status'],[name='state']">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-500 mb-1">Status</label>
+                <select name="status" class="px-3 py-2 border border-gray-300 rounded-lg text-sm" onchange="this.form.submit()">
+                    <option value="">All Statuses</option>
+                    {% for s in statuses %}
+                    <option value="{{ s }}" {% if current_status == s %}selected{% endif %}>{{ s }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-500 mb-1">State</label>
+                <select name="state" class="px-3 py-2 border border-gray-300 rounded-lg text-sm" onchange="this.form.submit()">
+                    <option value="">All States</option>
+                    {% for st in states %}
+                    <option value="{{ st }}" {% if current_state == st %}selected{% endif %}>{{ st }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200">Filter</button>
+        </form>
+        <!-- Actions (outside form, same row) -->
+        <div class="flex gap-2 border-l border-gray-200 pl-4">
+            <a href="/leads/trash" title="Trash"
+               class="px-3 py-2 bg-white text-gray-500 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 hover:text-gray-700 transition-colors flex items-center gap-1.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                Trash
+            </a>
+            <a href="/leads/export" title="Export all leads as CSV"
+               class="px-3 py-2 bg-white text-gray-500 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 hover:text-gray-700 transition-colors flex items-center gap-1.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                Export
+            </a>
         </div>
-        <div>
-            <label class="block text-xs font-medium text-gray-500 mb-1">Status</label>
-            <select name="status" class="px-3 py-2 border border-gray-300 rounded-lg text-sm" onchange="this.form.submit()">
-                <option value="">All Statuses</option>
-                {% for s in statuses %}
-                <option value="{{ s }}" {% if current_status == s %}selected{% endif %}>{{ s }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div>
-            <label class="block text-xs font-medium text-gray-500 mb-1">State</label>
-            <select name="state" class="px-3 py-2 border border-gray-300 rounded-lg text-sm" onchange="this.form.submit()">
-                <option value="">All States</option>
-                {% for st in states %}
-                <option value="{{ st }}" {% if current_state == st %}selected{% endif %}>{{ st }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <button type="submit" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200">Filter</button>
-    </form>
+    </div>
 </div>
 
 <!-- Leads Table -->

@@ -76,6 +76,7 @@ class Contact(Base):
     deal_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     company_id: Mapped[Optional[int]] = mapped_column(ForeignKey("companies.id"), nullable=True)
     company: Mapped[Optional["Company"]] = relationship(back_populates="contacts")

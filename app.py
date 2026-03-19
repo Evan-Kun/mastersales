@@ -225,26 +225,33 @@ def _get_user(request: Request, db: Session) -> User | None:
     return None
 
 
+# ── Helper: active contacts query (excludes soft-deleted) ─────────────────────
+
+def _active_contacts(db: Session):
+    """Return a query for contacts that have NOT been soft-deleted."""
+    return db.query(Contact).filter(Contact.deleted_at.is_(None))
+
+
 # ── Dashboard ──────────────────────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
 def dashboard(request: Request, db: Session = Depends(get_db)):
-    total_leads = db.query(Contact).count()
-    active_deals = db.query(Contact).filter(
+    total_leads = _active_contacts(db).count()
+    active_deals = _active_contacts(db).filter(
         Contact.lead_status.in_(["Qualified", "Proposal", "Negotiation"])
     ).count()
     proposals_sent = db.query(Proposal).filter(Proposal.status != "Draft").count()
     meetings_count = db.query(Meeting).count()
 
-    recent_leads = db.query(Contact).order_by(Contact.created_at.desc()).limit(5).all()
+    recent_leads = _active_contacts(db).order_by(Contact.created_at.desc()).limit(5).all()
 
     pipeline_counts = {}
     for status in ["New", "Contacted", "Qualified", "Proposal", "Negotiation", "Won", "Lost"]:
-        pipeline_counts[status] = db.query(Contact).filter(Contact.lead_status == status).count()
+        pipeline_counts[status] = _active_contacts(db).filter(Contact.lead_status == status).count()
 
     total_pipeline_value = sum(
         c.deal_value or 0
-        for c in db.query(Contact).filter(Contact.deal_value.isnot(None)).all()
+        for c in _active_contacts(db).filter(Contact.deal_value.isnot(None)).all()
     )
 
     return templates.TemplateResponse("dashboard.html", {
@@ -273,7 +280,7 @@ def leads_list(
     sort: str = "created_at",
     order: str = "desc",
 ):
-    query = db.query(Contact).join(Company, isouter=True)
+    query = _active_contacts(db).join(Company, isouter=True)
 
     if q:
         query = query.filter(
@@ -299,7 +306,7 @@ def leads_list(
     contacts = query.all()
 
     statuses = ["New", "Contacted", "Qualified", "Proposal", "Negotiation", "Won", "Lost"]
-    states = sorted(set(c.location_state for c in db.query(Contact).all() if c.location_state))
+    states = sorted(set(c.location_state for c in _active_contacts(db).all() if c.location_state))
 
     if request.headers.get("HX-Request"):
         return templates.TemplateResponse("partials/leads_table_body.html", {
@@ -364,7 +371,7 @@ def _export_contacts_csv(contacts):
 
 @app.get("/leads/export")
 def leads_export(db: Session = Depends(get_db)):
-    contacts = db.query(Contact).join(Company, isouter=True).order_by(Contact.created_at.desc()).all()
+    contacts = _active_contacts(db).join(Company, isouter=True).order_by(Contact.created_at.desc()).all()
     return _export_contacts_csv(contacts)
 
 
@@ -376,11 +383,10 @@ def leads_export_selected(db: Session = Depends(get_db), ids: list[int] = Form(.
 
 @app.post("/leads/delete-selected")
 def leads_delete_selected(db: Session = Depends(get_db), ids: list[int] = Form(...)):
-    # Delete related records first, then contacts
-    db.query(Meeting).filter(Meeting.contact_id.in_(ids)).delete(synchronize_session=False)
-    db.query(NurtureEnrollment).filter(NurtureEnrollment.contact_id.in_(ids)).delete(synchronize_session=False)
-    db.query(Proposal).filter(Proposal.contact_id.in_(ids)).delete(synchronize_session=False)
-    db.query(Contact).filter(Contact.id.in_(ids)).delete(synchronize_session=False)
+    # Soft delete: set deleted_at timestamp
+    now = datetime.utcnow()
+    db.query(Contact).filter(Contact.id.in_(ids), Contact.deleted_at.is_(None)).update(
+        {"deleted_at": now}, synchronize_session=False)
     db.commit()
     return RedirectResponse("/leads", status_code=303)
 
@@ -390,12 +396,69 @@ def lead_delete(contact_id: int, db: Session = Depends(get_db)):
     contact = db.query(Contact).get(contact_id)
     if not contact:
         raise HTTPException(status_code=404)
+    contact.deleted_at = datetime.utcnow()
+    db.commit()
+    return RedirectResponse("/leads", status_code=303)
+
+
+# ── Trash (soft-deleted leads) ────────────────────────────────────────────────
+
+@app.get("/leads/trash", response_class=HTMLResponse)
+def leads_trash(request: Request, db: Session = Depends(get_db)):
+    trashed = (
+        db.query(Contact).join(Company, isouter=True)
+        .filter(Contact.deleted_at.isnot(None))
+        .order_by(Contact.deleted_at.desc())
+        .all()
+    )
+    return templates.TemplateResponse("leads_trash.html", {
+        "request": request,
+        "settings": settings,
+        "user": _get_user(request, db),
+        "contacts": trashed,
+    })
+
+
+@app.post("/leads/trash/restore-selected")
+def leads_restore_selected(db: Session = Depends(get_db), ids: list[int] = Form(...)):
+    db.query(Contact).filter(Contact.id.in_(ids)).update(
+        {"deleted_at": None}, synchronize_session=False)
+    db.commit()
+    return RedirectResponse("/leads/trash", status_code=303)
+
+
+@app.post("/leads/{contact_id}/restore")
+def lead_restore(contact_id: int, db: Session = Depends(get_db)):
+    contact = db.query(Contact).get(contact_id)
+    if not contact:
+        raise HTTPException(status_code=404)
+    contact.deleted_at = None
+    db.commit()
+    return RedirectResponse("/leads/trash", status_code=303)
+
+
+@app.post("/leads/trash/force-delete-selected")
+def leads_force_delete_selected(db: Session = Depends(get_db), ids: list[int] = Form(...)):
+    # Permanent delete: remove related records then contacts
+    db.query(Meeting).filter(Meeting.contact_id.in_(ids)).delete(synchronize_session=False)
+    db.query(NurtureEnrollment).filter(NurtureEnrollment.contact_id.in_(ids)).delete(synchronize_session=False)
+    db.query(Proposal).filter(Proposal.contact_id.in_(ids)).delete(synchronize_session=False)
+    db.query(Contact).filter(Contact.id.in_(ids)).delete(synchronize_session=False)
+    db.commit()
+    return RedirectResponse("/leads/trash", status_code=303)
+
+
+@app.post("/leads/{contact_id}/force-delete")
+def lead_force_delete(contact_id: int, db: Session = Depends(get_db)):
+    contact = db.query(Contact).get(contact_id)
+    if not contact:
+        raise HTTPException(status_code=404)
     db.query(Meeting).filter(Meeting.contact_id == contact_id).delete()
     db.query(NurtureEnrollment).filter(NurtureEnrollment.contact_id == contact_id).delete()
     db.query(Proposal).filter(Proposal.contact_id == contact_id).delete()
     db.delete(contact)
     db.commit()
-    return RedirectResponse("/leads", status_code=303)
+    return RedirectResponse("/leads/trash", status_code=303)
 
 
 @app.get("/leads/{contact_id}", response_class=HTMLResponse)
@@ -469,7 +532,7 @@ def pipeline(request: Request, db: Session = Depends(get_db)):
     pipeline_stats = {}
     for stage in PIPELINE_STAGES:
         contacts = (
-            db.query(Contact)
+            _active_contacts(db)
             .filter(Contact.lead_status == stage)
             .order_by(Contact.updated_at.desc())
             .all()
@@ -504,7 +567,7 @@ def pipeline_move(
 
     pipeline_stats = {}
     for stage in PIPELINE_STAGES:
-        contacts = db.query(Contact).filter(Contact.lead_status == stage).all()
+        contacts = _active_contacts(db).filter(Contact.lead_status == stage).all()
         pipeline_stats[stage] = {
             "count": len(contacts),
             "total_value": sum(c.deal_value or 0 for c in contacts),
@@ -710,7 +773,7 @@ def scheduler_page(request: Request, db: Session = Depends(get_db)):
         .limit(10)
         .all()
     )
-    contacts = db.query(Contact).order_by(Contact.first_name).all()
+    contacts = _active_contacts(db).order_by(Contact.first_name).all()
 
     today = datetime.utcnow().date()
     week_start = today - timedelta(days=today.weekday())
@@ -785,7 +848,7 @@ def scheduler_cancel(meeting_id: int, db: Session = Depends(get_db)):
 def nurture_page(request: Request, db: Session = Depends(get_db)):
     sequences = db.query(NurtureSequence).all()
     enrollments = db.query(NurtureEnrollment).all()
-    contacts = db.query(Contact).order_by(Contact.first_name).all()
+    contacts = _active_contacts(db).order_by(Contact.first_name).all()
 
     return templates.TemplateResponse("nurture.html", {
         "request": request,
@@ -879,7 +942,7 @@ def nurture_advance(request: Request, enrollment_id: int, db: Session = Depends(
 @app.get("/proposals", response_class=HTMLResponse)
 def proposals_page(request: Request, db: Session = Depends(get_db)):
     proposals = db.query(Proposal).order_by(Proposal.created_at.desc()).all()
-    contacts = db.query(Contact).order_by(Contact.first_name).all()
+    contacts = _active_contacts(db).order_by(Contact.first_name).all()
 
     return templates.TemplateResponse("proposals.html", {
         "request": request,
