@@ -33,3 +33,23 @@ def _run_migrations():
         if "deleted_at" not in columns:
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE contacts ADD COLUMN deleted_at DATETIME"))
+
+        # New fields for multi-source scraper
+        if "source_url" not in columns:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE contacts ADD COLUMN source_url VARCHAR(500)"))
+
+        indexes = inspector.get_indexes("contacts")
+        has_linkedin_unique = any(
+            idx.get("unique") and "linkedin_url" in idx.get("column_names", [])
+            for idx in indexes
+        )
+        if has_linkedin_unique:
+            with engine.begin() as conn:
+                conn.execute(text("DROP INDEX IF EXISTS ix_contacts_linkedin_url"))
+
+    if "companies" in inspector.get_table_names():
+        columns = {c["name"] for c in inspector.get_columns("companies")}
+        if "company_domain" not in columns:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE companies ADD COLUMN company_domain VARCHAR(255)"))
