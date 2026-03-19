@@ -275,11 +275,72 @@ def run_scrape(
 
     deduped = dedup_results(all_results)
 
+    # Fair merge: guarantee each source gets at least MIN_PER_SOURCE results,
+    # then fill remaining slots with leftover results round-robin.
+    MIN_PER_SOURCE = 5
+    if len(deduped) > max_results and len(sources) > 1:
+        deduped = _fair_merge(deduped, sources, max_results, MIN_PER_SOURCE)
+
     with _lock:
         status["running"] = False
         status["total_found"] = len(deduped)
 
     return deduped, status
+
+
+def _fair_merge(
+    results: list[dict],
+    sources: list[str],
+    max_results: int,
+    min_per_source: int,
+) -> list[dict]:
+    """Merge results ensuring each source gets at least min_per_source slots.
+
+    1. Group results by primary source name
+    2. Take up to min_per_source from each source
+    3. Fill remaining slots with leftovers round-robin
+    """
+    # Group by primary source (first source name before comma)
+    by_source: dict[str, list[dict]] = {}
+    for r in results:
+        primary = r["source_name"].split(",")[0].strip()
+        # Map sub-sources to parent (e.g. "AusTender" -> "tenders_au")
+        matched_slug = None
+        for slug in sources:
+            scraper_cls = SCRAPERS.get(slug)
+            if scraper_cls and primary.startswith(scraper_cls.name.split()[0]):
+                matched_slug = slug
+                break
+        key = matched_slug or primary
+        by_source.setdefault(key, []).append(r)
+
+    # Phase 1: take min_per_source from each source that has results
+    merged = []
+    remaining_by_source: dict[str, list[dict]] = {}
+    for key, items in by_source.items():
+        take = min(min_per_source, len(items))
+        merged.extend(items[:take])
+        if len(items) > take:
+            remaining_by_source[key] = items[take:]
+
+    # Phase 2: fill remaining slots round-robin from leftovers
+    slots_left = max_results - len(merged)
+    if slots_left > 0 and remaining_by_source:
+        source_keys = list(remaining_by_source.keys())
+        idx = 0
+        while slots_left > 0 and remaining_by_source:
+            key = source_keys[idx % len(source_keys)]
+            if remaining_by_source[key]:
+                merged.append(remaining_by_source[key].pop(0))
+                slots_left -= 1
+            if not remaining_by_source[key]:
+                source_keys.remove(key)
+                if not source_keys:
+                    break
+            else:
+                idx += 1
+
+    return merged[:max_results]
 
 
 # ---------------------------------------------------------------------------
