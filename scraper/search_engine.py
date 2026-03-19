@@ -297,3 +297,6 @@ def _register_scrapers():
         "linkedin": LinkedInScraper, "aca": ACAScraper, "ampp": AMPPScraper,
         "tenders_au": AusTenderScraper, "tenders_nz": GETSScraper, "trade_shows": TradeShowScraper,
     }
+
+
+_register_scrapers()
