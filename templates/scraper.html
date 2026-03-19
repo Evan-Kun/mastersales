@@ -2,117 +2,322 @@
 {% block title %}Lead Sourcing{% endblock %}
 
 {% block content %}
-<div class="mb-6">
-    <h2 class="text-2xl font-bold text-gray-900">Lead Sourcing</h2>
-    <p class="text-sm text-gray-500 mt-1">Search LinkedIn for prospects matching your ICP</p>
-</div>
+<div x-data="scraperApp()" x-init="initCredentials()">
+    <!-- Page Header -->
+    <div class="mb-6">
+        <h2 class="text-2xl font-bold text-gray-900">Lead Sourcing</h2>
+        <p class="text-sm text-gray-500 mt-1">Multi-source prospect discovery</p>
+    </div>
 
-<!-- Search Form -->
-<div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-6">
-    <h3 class="text-lg font-semibold text-gray-900 mb-4">ICP Search Parameters</h3>
-    <form hx-post="/scraper/start" hx-target="#scraper-results" hx-swap="innerHTML" class="space-y-4">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div class="md:col-span-2">
-                <label class="block text-xs font-medium text-gray-500 mb-1">Industry Keywords (comma-separated)</label>
-                <input type="text" name="keywords" value="{{ settings.industry_keywords[:8] | join(', ') }}"
-                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy focus:border-navy"
-                       placeholder="steel, corrosion, fabrication...">
-            </div>
-            <div x-data="locationPicker()" @click.outside="open = false" class="relative">
-                <label class="block text-xs font-medium text-gray-500 mb-1">Location</label>
-                <input type="hidden" name="location" :value="selected.join('|')">
-                <!-- Tag display + input -->
-                <div @click="$refs.searchInput.focus(); open = true"
-                     class="w-full min-h-[38px] px-2 py-1.5 border border-gray-300 rounded-lg text-sm flex flex-wrap items-center gap-1 cursor-text focus-within:ring-2 focus-within:ring-navy focus-within:border-navy bg-white">
-                    <template x-for="loc in selected" :key="loc">
-                        <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-navy/10 text-navy rounded text-xs font-medium whitespace-nowrap">
-                            <span x-text="loc"></span>
-                            <button type="button" @click.stop="remove(loc)" class="hover:text-red-600">&times;</button>
-                        </span>
-                    </template>
-                    <input x-ref="searchInput" type="text" x-model="query" @focus="open = true" @keydown.backspace="onBackspace($event)"
-                           class="flex-1 min-w-[80px] outline-none border-none p-0 text-sm bg-transparent" placeholder="Type to add...">
+    <form hx-post="/scraper/start" hx-target="#scraper-results" hx-swap="innerHTML">
+        <!-- Shared Controls Card -->
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Search Parameters</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- Keywords -->
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Industry Keywords (comma-separated)</label>
+                    <input type="text" name="keywords" value="{{ settings.industry_keywords[:8] | join(', ') }}"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy focus:border-navy"
+                           placeholder="steel, corrosion, fabrication...">
                 </div>
-                <!-- Dropdown -->
-                <div x-show="open" x-transition.opacity class="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                    <template x-for="group in filteredGroups" :key="group.label">
-                        <div>
-                            <div class="px-3 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider bg-gray-50" x-text="group.label"></div>
-                            <template x-for="opt in group.items" :key="opt">
-                                <button type="button" @click="add(opt)"
-                                        class="w-full text-left px-3 py-1.5 text-sm hover:bg-navy/5 text-gray-700 flex items-center justify-between"
-                                        :class="selected.includes(opt) ? 'opacity-40 pointer-events-none' : ''">
-                                    <span x-text="opt"></span>
-                                    <span x-show="selected.includes(opt)" class="text-[10px] text-gray-400">added</span>
-                                </button>
-                            </template>
+                <!-- Location Multi-Select -->
+                <div x-data="locationPicker()" @click.outside="open = false" class="relative">
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Location</label>
+                    <input type="hidden" name="location" :value="selected.join('|')">
+                    <div @click="$refs.searchInput.focus(); open = true"
+                         class="w-full min-h-[38px] px-2 py-1.5 border border-gray-300 rounded-lg text-sm flex flex-wrap items-center gap-1 cursor-text focus-within:ring-2 focus-within:ring-navy focus-within:border-navy bg-white">
+                        <template x-for="loc in selected" :key="loc">
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-navy/10 text-navy rounded text-xs font-medium whitespace-nowrap">
+                                <span x-text="loc"></span>
+                                <button type="button" @click.stop="remove(loc)" class="hover:text-red-600">&times;</button>
+                            </span>
+                        </template>
+                        <input x-ref="searchInput" type="text" x-model="query" @focus="open = true" @keydown.backspace="onBackspace($event)"
+                               class="flex-1 min-w-[80px] outline-none border-none p-0 text-sm bg-transparent" placeholder="Type to add...">
+                    </div>
+                    <div x-show="open" x-transition.opacity class="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        <template x-for="group in filteredGroups" :key="group.label">
+                            <div>
+                                <div class="px-3 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider bg-gray-50" x-text="group.label"></div>
+                                <template x-for="opt in group.items" :key="opt">
+                                    <button type="button" @click="add(opt)"
+                                            class="w-full text-left px-3 py-1.5 text-sm hover:bg-navy/5 text-gray-700 flex items-center justify-between"
+                                            :class="selected.includes(opt) ? 'opacity-40 pointer-events-none' : ''">
+                                        <span x-text="opt"></span>
+                                        <span x-show="selected.includes(opt)" class="text-[10px] text-gray-400">added</span>
+                                    </button>
+                                </template>
+                            </div>
+                        </template>
+                        <div x-show="filteredGroups.length === 0" class="px-3 py-2 text-xs text-gray-400">No matching locations</div>
+                    </div>
+                </div>
+            </div>
+            <!-- Max Results Slider -->
+            <div class="mt-4 max-w-xs">
+                <label class="block text-xs font-medium text-gray-500 mb-1">Max Results: <span x-text="maxResults" class="font-semibold text-gray-900"></span></label>
+                <input type="range" name="max_results" min="5" max="100" step="5" x-model="maxResults"
+                       class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-navy">
+                <div class="flex justify-between text-[10px] text-gray-400 mt-0.5">
+                    <span>5</span>
+                    <span>50</span>
+                    <span>100</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab Bar -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
+            <div class="p-4 border-b border-gray-100">
+                <div class="flex flex-wrap gap-2">
+                    <template x-for="tab in tabs" :key="tab.slug">
+                        <button type="button" @click="activeTab = tab.slug"
+                                class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors"
+                                :class="activeTab === tab.slug ? 'bg-navy text-white' : 'text-gray-600 hover:bg-gray-100'">
+                            <span class="w-2 h-2 rounded-full" :class="getStatusDot(tab.slug)"></span>
+                            <span x-text="tab.label"></span>
+                        </button>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Per-Tab Config Panels -->
+            <div class="p-6">
+                <!-- LinkedIn Panel -->
+                <div x-show="activeTab === 'linkedin'" x-transition>
+                    <h4 class="text-sm font-semibold text-gray-900 mb-3">LinkedIn Configuration</h4>
+                    <div class="border border-gray-200 rounded-lg p-4 space-y-3">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1">LinkedIn Email</label>
+                                <input type="email" x-model="creds.linkedin.email"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy focus:border-navy"
+                                       placeholder="your@email.com">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1">LinkedIn Password</label>
+                                <input type="password" x-model="creds.linkedin.password"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy focus:border-navy"
+                                       placeholder="••••••••">
+                            </div>
                         </div>
-                    </template>
-                    <div x-show="filteredGroups.length === 0" class="px-3 py-2 text-xs text-gray-400">No matching locations</div>
+                        <div class="flex items-center justify-between">
+                            <label class="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
+                                <input type="checkbox" x-model="creds.linkedin.remember" @change="saveCreds('linkedin')"
+                                       class="rounded border-gray-300 text-navy focus:ring-navy">
+                                Remember on this device
+                            </label>
+                            <button type="button" @click="clearCreds('linkedin')" class="text-xs text-red-500 hover:text-red-700">Clear</button>
+                        </div>
+                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-2">
+                            <p class="text-xs text-gray-500">Credentials are stored in your browser only and sent with each scrape request. They are never saved on the server.</p>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-                <label class="block text-xs font-medium text-gray-500 mb-1">Max Results</label>
-                <input type="number" name="max_results" value="20" min="5" max="100"
-                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+
+                <!-- ACA Panel -->
+                <div x-show="activeTab === 'aca'" x-transition>
+                    <h4 class="text-sm font-semibold text-gray-900 mb-3">ACA (Australasian Corrosion Association) Configuration</h4>
+                    <div class="border border-gray-200 rounded-lg p-4 space-y-3">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1">ACA Username</label>
+                                <input type="text" x-model="creds.aca.username"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy focus:border-navy"
+                                       placeholder="username">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1">ACA Password</label>
+                                <input type="password" x-model="creds.aca.password"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy focus:border-navy"
+                                       placeholder="••••••••">
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <label class="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
+                                <input type="checkbox" x-model="creds.aca.remember" @change="saveCreds('aca')"
+                                       class="rounded border-gray-300 text-navy focus:ring-navy">
+                                Remember on this device
+                            </label>
+                            <button type="button" @click="clearCreds('aca')" class="text-xs text-red-500 hover:text-red-700">Clear</button>
+                        </div>
+                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-2">
+                            <p class="text-xs text-gray-500">Credentials are stored in your browser only and sent with each scrape request. They are never saved on the server.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AMPP Panel -->
+                <div x-show="activeTab === 'ampp'" x-transition>
+                    <h4 class="text-sm font-semibold text-gray-900 mb-3">AMPP (Association for Materials Protection and Performance) Configuration</h4>
+                    <div class="border border-gray-200 rounded-lg p-4 space-y-3">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1">AMPP Username</label>
+                                <input type="text" x-model="creds.ampp.username"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy focus:border-navy"
+                                       placeholder="username">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1">AMPP Password</label>
+                                <input type="password" x-model="creds.ampp.password"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy focus:border-navy"
+                                       placeholder="••••••••">
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <label class="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
+                                <input type="checkbox" x-model="creds.ampp.remember" @change="saveCreds('ampp')"
+                                       class="rounded border-gray-300 text-navy focus:ring-navy">
+                                Remember on this device
+                            </label>
+                            <button type="button" @click="clearCreds('ampp')" class="text-xs text-red-500 hover:text-red-700">Clear</button>
+                        </div>
+                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-2">
+                            <p class="text-xs text-gray-500">Credentials are stored in your browser only and sent with each scrape request. They are never saved on the server.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AU Tenders Panel -->
+                <div x-show="activeTab === 'au_tenders'" x-transition>
+                    <h4 class="text-sm font-semibold text-gray-900 mb-3">Australian Tenders Configuration</h4>
+                    <div class="border border-gray-200 rounded-lg p-4 space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1">Date From</label>
+                                <input type="date" x-model="tenders.au.dateFrom"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy focus:border-navy">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1">Date To</label>
+                                <input type="date" x-model="tenders.au.dateTo"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy focus:border-navy">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-2">States</label>
+                            <div class="flex flex-wrap gap-3">
+                                <template x-for="st in ['QLD', 'NSW', 'VIC', 'WA', 'SA', 'TAS', 'NT', 'ACT']" :key="st">
+                                    <label class="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer">
+                                        <input type="checkbox" :value="st" x-model="tenders.au.states"
+                                               class="rounded border-gray-300 text-navy focus:ring-navy">
+                                        <span x-text="st"></span>
+                                    </label>
+                                </template>
+                                <label class="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer border-l border-gray-300 pl-3">
+                                    <input type="checkbox" @change="toggleAllStates('au', $event.target.checked)"
+                                           :checked="tenders.au.states.length === 8"
+                                           class="rounded border-gray-300 text-navy focus:ring-navy">
+                                    All
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NZ Tenders Panel -->
+                <div x-show="activeTab === 'nz_tenders'" x-transition>
+                    <h4 class="text-sm font-semibold text-gray-900 mb-3">New Zealand Tenders Configuration</h4>
+                    <div class="border border-gray-200 rounded-lg p-4 space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1">Date From</label>
+                                <input type="date" x-model="tenders.nz.dateFrom"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy focus:border-navy">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1">Date To</label>
+                                <input type="date" x-model="tenders.nz.dateTo"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy focus:border-navy">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-2">Regions</label>
+                            <div class="flex flex-wrap gap-3">
+                                <template x-for="st in ['Auckland', 'Wellington', 'Canterbury', 'Waikato']" :key="st">
+                                    <label class="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer">
+                                        <input type="checkbox" :value="st" x-model="tenders.nz.states"
+                                               class="rounded border-gray-300 text-navy focus:ring-navy">
+                                        <span x-text="st"></span>
+                                    </label>
+                                </template>
+                                <label class="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer border-l border-gray-300 pl-3">
+                                    <input type="checkbox" @change="toggleAllStates('nz', $event.target.checked)"
+                                           :checked="tenders.nz.states.length === 4"
+                                           class="rounded border-gray-300 text-navy focus:ring-navy">
+                                    All
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Trade Shows Panel -->
+                <div x-show="activeTab === 'trade_shows'" x-transition>
+                    <h4 class="text-sm font-semibold text-gray-900 mb-3">Trade Shows Configuration</h4>
+                    <div class="border border-gray-200 rounded-lg p-4 space-y-4">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-2">Events</label>
+                            <div class="space-y-2">
+                                <template x-for="ev in tradeShowEvents" :key="ev.value">
+                                    <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                                        <input type="checkbox" :value="ev.value" x-model="selectedTradeShows"
+                                               class="rounded border-gray-300 text-navy focus:ring-navy">
+                                        <span x-text="ev.label"></span>
+                                    </label>
+                                </template>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Custom Event URL</label>
+                            <input type="text" x-model="tradeShowCustomUrl"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy focus:border-navy"
+                                   placeholder="https://example.com/exhibitors">
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- LinkedIn Credentials (stored in browser only) -->
-        <div x-data="{ open: false }" class="border border-gray-200 rounded-lg">
-            <button type="button" @click="open = !open" class="w-full flex items-center justify-between p-3 text-left">
-                <div class="flex items-center gap-2">
-                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
-                    </svg>
-                    <span class="text-sm font-medium text-gray-700">LinkedIn Credentials</span>
-                    <span id="cred-status" class="text-xs text-amber-600">(not set — demo mode)</span>
-                </div>
-                <svg :class="open ? 'rotate-180' : ''" class="w-4 h-4 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                </svg>
+        <!-- Source Selection + Submit -->
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-6">
+            <h3 class="text-sm font-semibold text-gray-900 mb-3">Select Sources to Scrape</h3>
+            <div class="flex flex-wrap gap-4 mb-4">
+                <template x-for="tab in tabs" :key="tab.slug">
+                    <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                        <input type="checkbox" :value="tab.slug" x-model="selectedSources"
+                               class="rounded border-gray-300 text-navy focus:ring-navy">
+                        <span x-text="tab.label"></span>
+                    </label>
+                </template>
+            </div>
+            <button type="submit" class="px-6 py-2.5 bg-navy text-white rounded-lg text-sm font-medium hover:bg-navy-light transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    :disabled="selectedSources.length === 0">
+                Scrape <span x-text="selectedSources.length"></span> Source<span x-show="selectedSources.length !== 1">s</span>
             </button>
-            <div x-show="open" x-collapse class="border-t border-gray-200 p-3 space-y-3">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-medium text-gray-500 mb-1">LinkedIn Email</label>
-                        <input type="email" name="linkedin_email" id="li-email"
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy focus:border-navy"
-                               placeholder="your@email.com">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-gray-500 mb-1">LinkedIn Password</label>
-                        <input type="password" name="linkedin_password" id="li-password"
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy focus:border-navy"
-                               placeholder="••••••••">
-                    </div>
-                </div>
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-2">
-                        <label class="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
-                            <input type="checkbox" id="li-remember" class="rounded border-gray-300 text-navy focus:ring-navy">
-                            Remember on this device
-                        </label>
-                    </div>
-                    <button type="button" onclick="clearCredentials()" class="text-xs text-red-500 hover:text-red-700">Clear</button>
-                </div>
-                <div class="bg-gray-50 border border-gray-200 rounded-lg p-2">
-                    <p class="text-xs text-gray-500">Credentials are stored in your browser only and sent with each scrape request. They are never saved on the server.</p>
-                </div>
-            </div>
         </div>
 
-        <button type="submit" class="px-6 py-2.5 bg-navy text-white rounded-lg text-sm font-medium hover:bg-navy-light transition-colors">
-            Start Scraping
-        </button>
+        <!-- Hidden form fields for all configs -->
+        <input type="hidden" name="sources" :value="selectedSources.join(',')">
+        <input type="hidden" name="linkedin_email" :value="creds.linkedin.email">
+        <input type="hidden" name="linkedin_password" :value="creds.linkedin.password">
+        <input type="hidden" name="aca_username" :value="creds.aca.username">
+        <input type="hidden" name="aca_password" :value="creds.aca.password">
+        <input type="hidden" name="ampp_username" :value="creds.ampp.username">
+        <input type="hidden" name="ampp_password" :value="creds.ampp.password">
+        <input type="hidden" name="tenders_date_from" :value="tenders.au.dateFrom">
+        <input type="hidden" name="tenders_date_to" :value="tenders.au.dateTo">
+        <input type="hidden" name="tenders_states" :value="tenders.au.states.join(',')">
+        <input type="hidden" name="trade_show_events" :value="selectedTradeShows.join(',')">
+        <input type="hidden" name="trade_show_custom_url" :value="tradeShowCustomUrl">
     </form>
-</div>
 
-<!-- Results -->
-<div id="scraper-results">
-    {% include "partials/scraper_status.html" %}
+    <!-- Results -->
+    <div id="scraper-results">
+        {% include "partials/scraper_status.html" %}
+    </div>
 </div>
 
 <script>
@@ -150,61 +355,138 @@ function locationPicker() {
     };
 }
 
-// Load saved credentials from localStorage on page load
-(function() {
-    const email = localStorage.getItem('li_email') || '';
-    const password = localStorage.getItem('li_password') || '';
-    const remember = localStorage.getItem('li_remember') === 'true';
+function scraperApp() {
+    const allStatesAU = ['QLD', 'NSW', 'VIC', 'WA', 'SA', 'TAS', 'NT', 'ACT'];
+    const allStatesNZ = ['Auckland', 'Wellington', 'Canterbury', 'Waikato'];
 
-    document.getElementById('li-email').value = email;
-    document.getElementById('li-password').value = password;
-    document.getElementById('li-remember').checked = remember;
+    return {
+        activeTab: 'linkedin',
+        maxResults: 20,
+        selectedSources: ['linkedin'],
+        tabs: [
+            { slug: 'linkedin', label: 'LinkedIn' },
+            { slug: 'aca', label: 'ACA' },
+            { slug: 'ampp', label: 'AMPP' },
+            { slug: 'au_tenders', label: 'AU Tenders' },
+            { slug: 'nz_tenders', label: 'NZ Tenders' },
+            { slug: 'trade_shows', label: 'Trade Shows' },
+        ],
+        creds: {
+            linkedin: { email: '', password: '', remember: false },
+            aca: { username: '', password: '', remember: false },
+            ampp: { username: '', password: '', remember: false },
+        },
+        tenders: {
+            au: { dateFrom: '', dateTo: '', states: [] },
+            nz: { dateFrom: '', dateTo: '', states: [] },
+        },
+        tradeShowEvents: [
+            { value: 'australasian_oil_gas', label: 'Australasian Oil & Gas Exhibition' },
+            { value: 'corrosion_prevention', label: 'Corrosion & Prevention Conference' },
+            { value: 'aimex', label: 'AIMEX - Asia-Pacific International Mining Exhibition' },
+            { value: 'ausrail', label: 'AusRAIL Conference & Exhibition' },
+        ],
+        selectedTradeShows: [],
+        tradeShowCustomUrl: '',
 
-    updateCredStatus(email);
+        initCredentials() {
+            // Load LinkedIn credentials
+            this.creds.linkedin.email = localStorage.getItem('li_email') || '';
+            this.creds.linkedin.password = localStorage.getItem('li_password') || '';
+            this.creds.linkedin.remember = localStorage.getItem('li_remember') === 'true';
 
-    // Save to localStorage on input change (if remember is checked)
-    document.getElementById('li-email').addEventListener('input', function() {
-        if (document.getElementById('li-remember').checked) {
-            localStorage.setItem('li_email', this.value);
-        }
-        updateCredStatus(this.value);
-    });
-    document.getElementById('li-password').addEventListener('input', function() {
-        if (document.getElementById('li-remember').checked) {
-            localStorage.setItem('li_password', this.value);
-        }
-    });
-    document.getElementById('li-remember').addEventListener('change', function() {
-        localStorage.setItem('li_remember', this.checked);
-        if (this.checked) {
-            localStorage.setItem('li_email', document.getElementById('li-email').value);
-            localStorage.setItem('li_password', document.getElementById('li-password').value);
-        } else {
-            localStorage.removeItem('li_email');
-            localStorage.removeItem('li_password');
-        }
-    });
-})();
+            // Load ACA credentials
+            this.creds.aca.username = localStorage.getItem('aca_username') || '';
+            this.creds.aca.password = localStorage.getItem('aca_password') || '';
+            this.creds.aca.remember = localStorage.getItem('aca_remember') === 'true';
 
-function updateCredStatus(email) {
-    const el = document.getElementById('cred-status');
-    if (email) {
-        el.textContent = '(configured)';
-        el.className = 'text-xs text-green-600';
-    } else {
-        el.textContent = '(not set — demo mode)';
-        el.className = 'text-xs text-amber-600';
-    }
-}
+            // Load AMPP credentials
+            this.creds.ampp.username = localStorage.getItem('ampp_username') || '';
+            this.creds.ampp.password = localStorage.getItem('ampp_password') || '';
+            this.creds.ampp.remember = localStorage.getItem('ampp_remember') === 'true';
 
-function clearCredentials() {
-    document.getElementById('li-email').value = '';
-    document.getElementById('li-password').value = '';
-    document.getElementById('li-remember').checked = false;
-    localStorage.removeItem('li_email');
-    localStorage.removeItem('li_password');
-    localStorage.removeItem('li_remember');
-    updateCredStatus('');
+            // Watch credential changes for auto-save
+            this.$watch('creds.linkedin.email', () => this.autoSave('linkedin'));
+            this.$watch('creds.linkedin.password', () => this.autoSave('linkedin'));
+            this.$watch('creds.aca.username', () => this.autoSave('aca'));
+            this.$watch('creds.aca.password', () => this.autoSave('aca'));
+            this.$watch('creds.ampp.username', () => this.autoSave('ampp'));
+            this.$watch('creds.ampp.password', () => this.autoSave('ampp'));
+        },
+
+        autoSave(source) {
+            if (this.creds[source].remember) {
+                this.saveCreds(source);
+            }
+        },
+
+        saveCreds(source) {
+            const c = this.creds[source];
+            if (source === 'linkedin') {
+                if (c.remember) {
+                    localStorage.setItem('li_email', c.email);
+                    localStorage.setItem('li_password', c.password);
+                    localStorage.setItem('li_remember', 'true');
+                } else {
+                    localStorage.removeItem('li_email');
+                    localStorage.removeItem('li_password');
+                    localStorage.setItem('li_remember', 'false');
+                }
+            } else {
+                const prefix = source;
+                if (c.remember) {
+                    localStorage.setItem(prefix + '_username', c.username);
+                    localStorage.setItem(prefix + '_password', c.password);
+                    localStorage.setItem(prefix + '_remember', 'true');
+                } else {
+                    localStorage.removeItem(prefix + '_username');
+                    localStorage.removeItem(prefix + '_password');
+                    localStorage.setItem(prefix + '_remember', 'false');
+                }
+            }
+        },
+
+        clearCreds(source) {
+            if (source === 'linkedin') {
+                this.creds.linkedin = { email: '', password: '', remember: false };
+                localStorage.removeItem('li_email');
+                localStorage.removeItem('li_password');
+                localStorage.removeItem('li_remember');
+            } else {
+                this.creds[source] = { username: '', password: '', remember: false };
+                localStorage.removeItem(source + '_username');
+                localStorage.removeItem(source + '_password');
+                localStorage.removeItem(source + '_remember');
+            }
+        },
+
+        getStatusDot(slug) {
+            switch (slug) {
+                case 'linkedin':
+                    return this.creds.linkedin.email ? 'bg-green-400' : 'bg-gray-300';
+                case 'aca':
+                    return this.creds.aca.username ? 'bg-green-400' : 'bg-gray-300';
+                case 'ampp':
+                    return this.creds.ampp.username ? 'bg-green-400' : 'bg-gray-300';
+                case 'au_tenders':
+                    return this.tenders.au.dateFrom ? 'bg-green-400' : 'bg-gray-300';
+                case 'nz_tenders':
+                    return this.tenders.nz.dateFrom ? 'bg-green-400' : 'bg-gray-300';
+                case 'trade_shows':
+                    return this.selectedTradeShows.length > 0 || this.tradeShowCustomUrl ? 'bg-green-400' : 'bg-gray-300';
+                default:
+                    return 'bg-gray-300';
+            }
+        },
+
+        toggleAllStates(region, checked) {
+            if (region === 'au') {
+                this.tenders.au.states = checked ? [...allStatesAU] : [];
+            } else {
+                this.tenders.nz.states = checked ? [...allStatesNZ] : [];
+            }
+        },
+    };
 }
 </script>
 {% endblock %}
