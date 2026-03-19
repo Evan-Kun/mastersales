@@ -10,7 +10,7 @@ AU_PORTALS = {
     "austender": {
         "name": "AusTender",
         "base_url": "https://www.tenders.gov.au",
-        "search_path": "/Search/KeywordSearch",
+        "search_path": "/cn/search",
     },
     "qtenders": {
         "name": "QTenders",
@@ -99,8 +99,105 @@ class AusTenderScraper(BaseScraper):
         self, page, portal: dict, keywords: list[str], config: ScraperConfig, limit: int
     ) -> list[ScraperResult]:
         """Scrape a single tender portal for awarded contracts matching keywords."""
+        # Use specialised path for AusTender Contract Notices
+        if portal.get("name") == "AusTender":
+            return self._scrape_austender_cn(page, portal, keywords, limit)
+        return self._scrape_generic_portal(page, portal, keywords, limit)
+
+    def _scrape_austender_cn(
+        self, page, portal: dict, keywords: list[str], limit: int
+    ) -> list[ScraperResult]:
+        """Scrape AusTender Contract Notices search (/cn/search).
+
+        The search is a 2-step form:
+          Step 1 — fill criteria (keyword, date range, supplier, etc.)
+          Step 2 — view results table
+        """
+        results: list[ScraperResult] = []
+        keyword_str = " ".join(keywords[:3])
+        url = f"{portal['base_url']}{portal['search_path']}"
+
+        try:
+            page.goto(url, timeout=25000)
+            page.wait_for_load_state("domcontentloaded", timeout=15000)
+
+            # Fill Keyword field (labelled "Keyword")
+            if keyword_str.strip():
+                try:
+                    page.get_by_role("textbox", name="Keyword").fill(keyword_str)
+                except Exception:
+                    # Fallback to CSS selectors
+                    for sel in ['input[name="keyword"]', 'input[name="Keyword"]',
+                                '#keyword', 'input[type="text"]']:
+                        try:
+                            el = page.query_selector(sel)
+                            if el:
+                                el.fill(keyword_str)
+                                break
+                        except Exception:
+                            continue
+
+            # Fill date range — last 12 months in DD-MMM-YYYY format
+            from_date = (datetime.now() - timedelta(days=365)).strftime("%d-%b-%Y")
+            to_date = datetime.now().strftime("%d-%b-%Y")
+            try:
+                page.get_by_role("textbox", name="from").first.fill(from_date)
+            except Exception:
+                for sel in ['input[name="fromDate"]', 'input[name="publishedFrom"]']:
+                    try:
+                        el = page.query_selector(sel)
+                        if el:
+                            el.fill(from_date)
+                            break
+                    except Exception:
+                        continue
+            try:
+                page.get_by_role("textbox", name="to").first.fill(to_date)
+            except Exception:
+                for sel in ['input[name="toDate"]', 'input[name="publishedTo"]']:
+                    try:
+                        el = page.query_selector(sel)
+                        if el:
+                            el.fill(to_date)
+                            break
+                    except Exception:
+                        continue
+
+            # Click Search button
+            submitted = False
+            try:
+                page.get_by_role("button", name="Search").click()
+                submitted = True
+            except Exception:
+                for sel in ['button[type="submit"]', 'input[type="submit"]',
+                            'button:has-text("Search")', '#searchButton']:
+                    try:
+                        btn = page.query_selector(sel)
+                        if btn:
+                            btn.click()
+                            submitted = True
+                            break
+                    except Exception:
+                        continue
+
+            if submitted:
+                # Wait for Step 2 results page to load
+                page.wait_for_load_state("networkidle", timeout=20000)
+
+            # Extract results from the CN results table
+            results = self._extract_tender_results(page, portal)
+
+        except Exception as e:
+            logger.warning(f"[AU Tenders] AusTender CN scrape error: {e}")
+
+        return results[:limit]
+
+    def _scrape_generic_portal(
+        self, page, portal: dict, keywords: list[str], limit: int
+    ) -> list[ScraperResult]:
+        """Scrape a generic state tender portal."""
         results = []
-        keyword_str = " ".join(keywords[:3])  # Most portals limit search terms
+        keyword_str = " ".join(keywords[:3])
         url = f"{portal['base_url']}{portal['search_path']}"
 
         try:
