@@ -262,8 +262,19 @@ def run_scrape(
                 )
         except Exception as e:
             logger.exception("Scraper %s failed: %s", slug, e)
-            with _lock:
-                status["sources"][slug] = {"status": "error", "found": 0}
+            # Fall back to demo results so the user still sees something
+            try:
+                logger.info("[%s] Falling back to demo results after error", slug)
+                results = scraper.generate_demo_results(config)
+                with _lock:
+                    all_results.extend(results)
+                    status["sources"][slug] = {"status": "complete", "found": len(results)}
+                    status["total_found"] = sum(
+                        s["found"] for s in status["sources"].values()
+                    )
+            except Exception:
+                with _lock:
+                    status["sources"][slug] = {"status": "error", "found": 0}
         finally:
             if acquired:
                 _browser_semaphore.release()

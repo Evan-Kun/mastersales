@@ -154,6 +154,22 @@ class LinkedInScraper(BaseScraper):
         self.page.goto("https://www.linkedin.com/login")
         self._random_delay("login page load")
 
+        # Wait for CAPTCHA to be solved if present (up to 120s for manual solving)
+        captcha_selectors = ['iframe[src*="captcha"]', 'iframe[src*="recaptcha"]', '#captcha-internal']
+        has_captcha = any(self.page.query_selector(s) for s in captcha_selectors)
+        if has_captcha or "checkpoint" in self.page.url or "security" in self.page.content()[:2000].lower():
+            logger.info("  CAPTCHA detected — waiting up to 120s for manual solving...")
+            try:
+                self.page.wait_for_selector(
+                    '#username, input[name="session_key"]',
+                    timeout=120_000,
+                )
+                logger.info("  CAPTCHA solved — login form is now visible")
+                self._random_delay("post-captcha")
+            except Exception:
+                logger.error("  CAPTCHA not solved within 120s — aborting login")
+                raise Exception("LinkedIn CAPTCHA not solved in time")
+
         # LinkedIn updated their login page — try multiple selectors
         logger.info("  Filling credentials...")
         email_filled = False
@@ -271,7 +287,7 @@ class LinkedInScraper(BaseScraper):
 
         with sync_playwright() as p:
             logger.info("  Launching headless Chromium...")
-            self.browser = p.chromium.launch(headless=True)
+            self.browser = p.chromium.launch(headless=False)
             context = self.browser.new_context(
                 viewport={"width": 1280, "height": 900},
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
@@ -442,48 +458,68 @@ class LinkedInScraper(BaseScraper):
     def _extract_from_dom(self) -> list[dict]:
         """Extract people from DOM using LinkedIn's current HTML structure.
 
-        LinkedIn uses data-view-name="people-search-result" cards with:
-        - a[data-view-name="search-result-lockup-title"] for the name
-        - Sequential <p> tags for headline and location
-        - Outer <a href="/in/..."> for the profile URL
+        LinkedIn uses data-view-name="search-entity-result-universal-template"
+        cards with obfuscated class names. We find cards by the data attribute,
+        then extract name from <a href="/in/...">, headline from the first
+        t-black div after the name, and location from the t-normal div after that.
         """
         people = []
 
         raw = self.page.evaluate('''
             () => {
                 const results = [];
-                const cards = document.querySelectorAll('[data-view-name="people-search-result"]');
+                // Current LinkedIn selector (2025+)
+                let cards = document.querySelectorAll('[data-view-name="search-entity-result-universal-template"]');
+                // Fallback to old selector
+                if (cards.length === 0) {
+                    cards = document.querySelectorAll('[data-view-name="people-search-result"]');
+                }
 
                 for (const card of cards) {
-                    // Get profile URL from the card's <a> with /in/ href
+                    // Get profile URL from <a href="/in/...">
                     let url = '';
-                    const profileLink = card.querySelector('a[href*="/in/"]');
-                    if (profileLink) {
-                        url = profileLink.href.split('?')[0];
+                    const profileLinks = card.querySelectorAll('a[href*="/in/"]');
+                    for (const link of profileLinks) {
+                        const href = link.href.split('?')[0];
+                        if (href.match(/linkedin\\.com\\/in\\/.+/) && !url) {
+                            url = href;
+                        }
                     }
 
-                    // Get name from the search-result-lockup-title link
+                    // Get name: find <span aria-hidden="true"> inside a profile link
                     let name = '';
-                    const nameEl = card.querySelector('a[data-view-name="search-result-lockup-title"]');
-                    if (nameEl) {
-                        name = nameEl.textContent.trim();
+                    for (const link of profileLinks) {
+                        const span = link.querySelector('span[dir="ltr"] span[aria-hidden="true"]');
+                        if (span) {
+                            name = span.textContent.trim();
+                            break;
+                        }
+                    }
+                    // Fallback: try data-view-name title link
+                    if (!name) {
+                        const nameEl = card.querySelector('a[data-view-name="search-result-lockup-title"]');
+                        if (nameEl) name = nameEl.textContent.trim();
                     }
 
-                    // Get headline and location from <p> tags
-                    // The card structure has: name <p>, then headline <p>, then location <p>
-                    const allPs = card.querySelectorAll('p');
+                    // Get headline and location from sequential divs
+                    // LinkedIn uses obfuscated classes but the structure is:
+                    //   div.t-14.t-black.t-normal  → headline/job title
+                    //   div.t-14.t-normal           → location
+                    // We collect all t-14 divs that are direct content holders
+                    const allDivs = card.querySelectorAll('div.t-14');
                     const textLines = [];
-                    for (const p of allPs) {
-                        const text = p.textContent.trim();
+                    for (const div of allDivs) {
+                        const text = div.textContent.trim();
                         if (!text || text.length < 2) continue;
-                        // Skip if this <p> contains the name
-                        if (name && text.includes(name)) continue;
-                        // Skip connection degree markers
-                        if (/^[•·]?\s*(1st|2nd|3rd)\+?$/.test(text)) continue;
+                        if (name && text === name) continue;
+                        // Skip connection degree and badge text
+                        if (/^[•·]?\s*(1st|2nd|3rd)\+?/.test(text)) continue;
+                        if (text === 'Connect' || text === 'Follow' || text === 'Message') continue;
+                        // Skip divs that contain child divs (wrapper divs, not leaf text)
+                        if (div.querySelector('div.t-14')) continue;
                         textLines.push(text);
                     }
 
-                    // Also check for "Current:/Past:" info in the full card text
                     const fullText = card.innerText || '';
 
                     results.push({
