@@ -245,14 +245,10 @@ def run_scrape(
                 acquired = True
 
             if needs_auth and not has_creds:
-                results = scraper.generate_demo_results(config)
+                logger.info("[%s] No credentials provided — skipping (demo disabled)", slug)
+                results = []
             else:
                 results = scraper.scrape(config)
-                # Fall back to demo if scrape returned nothing
-                # (e.g. Playwright can't reach the site)
-                if not results and not has_creds:
-                    logger.info("[%s] Scrape returned 0 results — falling back to demo", slug)
-                    results = scraper.generate_demo_results(config)
 
             with _lock:
                 all_results.extend(results)
@@ -262,17 +258,7 @@ def run_scrape(
                 )
         except Exception as e:
             logger.exception("Scraper %s failed: %s", slug, e)
-            # Fall back to demo results so the user still sees something
-            try:
-                logger.info("[%s] Falling back to demo results after error", slug)
-                results = scraper.generate_demo_results(config)
-                with _lock:
-                    all_results.extend(results)
-                    status["sources"][slug] = {"status": "complete", "found": len(results)}
-                    status["total_found"] = sum(
-                        s["found"] for s in status["sources"].values()
-                    )
-            except Exception:
+            with _lock:
                 with _lock:
                     status["sources"][slug] = {"status": "error", "found": 0}
         finally:
