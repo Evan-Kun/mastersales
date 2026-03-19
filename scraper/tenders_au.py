@@ -68,12 +68,13 @@ class AusTenderScraper(BaseScraper):
 
                 # Always scrape AusTender (federal)
                 portals_to_scrape = ["austender"]
-                # Add state portals based on filter
-                for slug, portal in AU_PORTALS.items():
-                    if slug == "austender":
-                        continue
-                    if not states or portal.get("state") in states:
-                        portals_to_scrape.append(slug)
+                # Only add state portals if explicitly selected (not by default — too slow)
+                if states:
+                    for slug, portal in AU_PORTALS.items():
+                        if slug == "austender":
+                            continue
+                        if portal.get("state") in states:
+                            portals_to_scrape.append(slug)
 
                 for portal_slug in portals_to_scrape:
                     if is_cancelled() or len(results) >= max_results:
@@ -107,90 +108,151 @@ class AusTenderScraper(BaseScraper):
     def _scrape_austender_cn(
         self, page, portal: dict, keywords: list[str], limit: int
     ) -> list[ScraperResult]:
-        """Scrape AusTender Contract Notices search (/cn/search).
+        """Scrape AusTender Contract Notices via the 'View by Publish Date' button.
 
-        The search is a 2-step form:
-          Step 1 — fill criteria (keyword, date range, supplier, etc.)
-          Step 2 — view results table
+        Navigates to /cn/search, clicks the 'View' button to load results
+        at /Cn/List?Weekly=..., then extracts data from <article> elements.
+        Paginates via ?Weekly=...&page=N links until limit is reached.
         """
         results: list[ScraperResult] = []
-        keyword_str = " ".join(keywords[:3])
-        url = f"{portal['base_url']}{portal['search_path']}"
+        base_url = portal["base_url"]
+        url = f"{base_url}{portal['search_path']}"
 
         try:
             page.goto(url, timeout=25000)
             page.wait_for_load_state("domcontentloaded", timeout=15000)
 
-            # Fill Keyword field (labelled "Keyword")
-            if keyword_str.strip():
+            # Click the "View" button to load results by publish date
+            try:
+                page.get_by_role("button", name="View").click()
+            except Exception:
                 try:
-                    page.get_by_role("textbox", name="Keyword").fill(keyword_str)
+                    page.locator('button:has-text("View")').click()
                 except Exception:
-                    # Fallback to CSS selectors
-                    for sel in ['input[name="keyword"]', 'input[name="Keyword"]',
-                                '#keyword', 'input[type="text"]']:
-                        try:
-                            el = page.query_selector(sel)
-                            if el:
-                                el.fill(keyword_str)
-                                break
-                        except Exception:
-                            continue
+                    # Last resort: submit the form
+                    page.get_by_role("button", name="Search").click()
 
-            # Fill date range — last 12 months in DD-MMM-YYYY format
-            from_date = (datetime.now() - timedelta(days=365)).strftime("%d-%b-%Y")
-            to_date = datetime.now().strftime("%d-%b-%Y")
-            try:
-                page.get_by_role("textbox", name="from").first.fill(from_date)
-            except Exception:
-                for sel in ['input[name="fromDate"]', 'input[name="publishedFrom"]']:
-                    try:
-                        el = page.query_selector(sel)
-                        if el:
-                            el.fill(from_date)
-                            break
-                    except Exception:
-                        continue
-            try:
-                page.get_by_role("textbox", name="to").first.fill(to_date)
-            except Exception:
-                for sel in ['input[name="toDate"]', 'input[name="publishedTo"]']:
-                    try:
-                        el = page.query_selector(sel)
-                        if el:
-                            el.fill(to_date)
-                            break
-                    except Exception:
-                        continue
+            page.wait_for_load_state("domcontentloaded", timeout=20000)
 
-            # Click Search button
-            submitted = False
-            try:
-                page.get_by_role("button", name="Search").click()
-                submitted = True
-            except Exception:
-                for sel in ['button[type="submit"]', 'input[type="submit"]',
-                            'button:has-text("Search")', '#searchButton']:
-                    try:
-                        btn = page.query_selector(sel)
-                        if btn:
-                            btn.click()
-                            submitted = True
-                            break
-                    except Exception:
-                        continue
+            # Extract results from articles, paginating as needed
+            while len(results) < limit:
+                page_results = self._extract_article_results(page, portal)
+                if not page_results:
+                    break
+                results.extend(page_results)
 
-            if submitted:
-                # Wait for Step 2 results page to load
-                page.wait_for_load_state("networkidle", timeout=20000)
+                if len(results) >= limit:
+                    break
 
-            # Extract results from the CN results table
-            results = self._extract_tender_results(page, portal)
+                # Try to navigate to the next page
+                next_link = page.query_selector('a[href*="page="]')
+                # Find the "next page" link — look for page=N where N > current
+                next_page_found = False
+                links = page.query_selector_all('a[href*="page="]')
+                for link in links:
+                    text = link.inner_text().strip()
+                    # Look for "Next" or ">" or a number that's the next page
+                    if text in ("Next", ">", "»", "next"):
+                        link.click()
+                        page.wait_for_load_state("domcontentloaded", timeout=15000)
+                        next_page_found = True
+                        break
+                if not next_page_found:
+                    break
 
         except Exception as e:
             logger.warning(f"[AU Tenders] AusTender CN scrape error: {e}")
 
         return results[:limit]
+
+    def _extract_article_results(self, page, portal: dict) -> list[ScraperResult]:
+        """Extract company/contact data from AusTender <article> elements.
+
+        Each article contains a heading (contract title) and div pairs
+        with labels like 'Supplier Name:', 'Agency:', 'Contract Value (AUD):'.
+        """
+        results = []
+        base_url = portal["base_url"]
+        articles = page.query_selector_all("article")
+
+        for article in articles:
+            try:
+                text = article.inner_text()
+                lines = [l.strip() for l in text.split("\n") if l.strip()]
+                if len(lines) < 2:
+                    continue
+
+                # Extract fields by looking for label patterns in the text
+                supplier_name = None
+                agency = None
+                contract_value = None
+                title = None
+
+                # Try to get heading (h2) for contract title
+                heading = article.query_selector("h2, h3, heading")
+                if heading:
+                    title = heading.inner_text().strip()
+                elif lines:
+                    title = lines[0]
+
+                # Parse label-value pairs from text lines
+                for i, line in enumerate(lines):
+                    lower = line.lower()
+                    if "supplier name" in lower and ":" in line:
+                        # Value is either after the colon or on the next line
+                        after_colon = line.split(":", 1)[-1].strip()
+                        if after_colon:
+                            supplier_name = after_colon
+                        elif i + 1 < len(lines):
+                            supplier_name = lines[i + 1]
+                    elif "agency" in lower and ":" in line:
+                        after_colon = line.split(":", 1)[-1].strip()
+                        if after_colon:
+                            agency = after_colon
+                        elif i + 1 < len(lines):
+                            agency = lines[i + 1]
+                    elif "contract value" in lower and ":" in line:
+                        after_colon = line.split(":", 1)[-1].strip()
+                        if after_colon:
+                            contract_value = after_colon
+                        elif i + 1 < len(lines):
+                            contract_value = lines[i + 1]
+
+                company_name = supplier_name or agency or title or "Unknown"
+
+                # Try to find "Full Details" link for source URL
+                source_url = None
+                links = article.query_selector_all("a[href]")
+                for link in links:
+                    link_text = link.inner_text().strip().lower()
+                    if "full details" in link_text or "detail" in link_text:
+                        href = link.get_attribute("href")
+                        if href:
+                            source_url = href if href.startswith("http") else f"{base_url}{href}"
+                        break
+                # Fallback: use first link
+                if not source_url and links:
+                    href = links[0].get_attribute("href")
+                    if href:
+                        source_url = href if href.startswith("http") else f"{base_url}{href}"
+
+                results.append({
+                    "first_name": "Unknown",
+                    "last_name": "Contact",
+                    "job_title": "Contract Officer",
+                    "company_name": company_name,
+                    "company_domain": None,
+                    "linkedin_url": None,
+                    "location_city": None,
+                    "location_state": portal.get("state"),
+                    "location_country": "AU",
+                    "source_url": source_url or f"{base_url}{portal['search_path']}",
+                    "source_name": portal["name"],
+                })
+            except Exception:
+                continue
+
+        return results
 
     def _scrape_generic_portal(
         self, page, portal: dict, keywords: list[str], limit: int
@@ -246,11 +308,21 @@ class AusTenderScraper(BaseScraper):
         return results[:limit]
 
     def _extract_tender_results(self, page, portal: dict) -> list[ScraperResult]:
-        """Extract company/contact data from tender search results."""
+        """Extract company/contact data from tender search results.
+
+        Handles both <article>-based layouts (AusTender) and traditional
+        table/list layouts (state portals).
+        """
+        # First try article-based extraction (AusTender style)
+        articles = page.query_selector_all("article")
+        if articles:
+            return self._extract_article_results(page, portal)
+
+        # Fallback: table rows or list items (state portals)
         results = []
         row_selectors = [
             "table tbody tr", ".search-result", ".tender-item",
-            ".result-item", "article", ".list-group-item",
+            ".result-item", ".list-group-item",
         ]
 
         for selector in row_selectors:
@@ -264,23 +336,22 @@ class AusTenderScraper(BaseScraper):
                 if len(lines) < 2:
                     continue
 
-                # Tender results typically have: title, agency/company, status, dates
-                # Extract company name (usually the supplier/awardee)
                 company_name = None
                 contact_name = None
 
                 for line in lines:
-                    # Look for company-like patterns
-                    if any(kw in line.lower() for kw in ("pty ltd", "group", "services", "engineering", "steel")):
+                    lower = line.lower()
+                    # Look for supplier/company name patterns
+                    if "supplier name" in lower and ":" in line:
+                        company_name = line.split(":", 1)[-1].strip()
+                    elif any(kw in lower for kw in ("pty ltd", "group", "services", "engineering", "steel")):
                         company_name = line.strip()
-                    # Look for contact officer pattern
-                    if "contact" in line.lower() and ":" in line:
+                    if "contact" in lower and ":" in line:
                         contact_name = line.split(":")[-1].strip()
 
                 if not company_name:
                     company_name = lines[1] if len(lines) > 1 else "Unknown"
 
-                # Parse contact name
                 first_name = "Unknown"
                 last_name = "Contact"
                 if contact_name:
@@ -291,7 +362,6 @@ class AusTenderScraper(BaseScraper):
                     elif len(parts) == 1:
                         first_name = parts[0]
 
-                # Try to find link for source_url
                 link = row.query_selector("a[href]")
                 source_url = None
                 if link:
