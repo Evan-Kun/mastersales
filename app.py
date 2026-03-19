@@ -47,6 +47,29 @@ app = FastAPI(title=settings.app_name, lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
+# ── Source badge CSS helper ────────────────────────────────────────────────────
+
+SOURCE_BADGE_CSS = {
+    "LinkedIn": "bg-sky-100 text-sky-700",
+    "ACA": "bg-emerald-100 text-emerald-700",
+    "AMPP": "bg-orange-100 text-orange-700",
+    "AusTender": "bg-violet-100 text-violet-700",
+    "QTenders": "bg-violet-100 text-violet-700",
+    "eTendering": "bg-violet-100 text-violet-700",
+    "Tenders VIC": "bg-violet-100 text-violet-700",
+    "GEMS WA": "bg-violet-100 text-violet-700",
+    "GETS": "bg-indigo-100 text-indigo-700",
+}
+_DEFAULT_BADGE = "bg-amber-100 text-amber-700"
+
+def get_source_badge_css(source_name: str) -> str:
+    for key, css in SOURCE_BADGE_CSS.items():
+        if source_name.startswith(key):
+            return css
+    if "Trade Show" in source_name:
+        return _DEFAULT_BADGE
+    return "bg-gray-100 text-gray-700"
+
 
 # ── Auth middleware ────────────────────────────────────────────────────────────
 
@@ -582,8 +605,11 @@ def pipeline_move(
 
 # ── Scraper ────────────────────────────────────────────────────────────────────
 
+import threading as _threading
+
 scraper_results: list[dict] = []
-scraper_status: dict = {"running": False, "found": 0, "message": "Idle"}
+scraper_status: dict = {"running": False, "sources": {}, "total_found": 0, "message": "Idle"}
+_scraper_lock = _threading.Lock()
 
 
 @app.get("/scraper", response_class=HTMLResponse)
@@ -594,6 +620,7 @@ def scraper_page(request: Request, db: Session = Depends(get_db)):
         "user": _get_user(request, db),
         "scraper_status": scraper_status,
         "results": scraper_results,
+        "get_source_badge_css": get_source_badge_css,
     })
 
 
@@ -603,34 +630,73 @@ def scraper_start(
     keywords: str = Form(""),
     location: str = Form("Australia"),
     max_results: int = Form(20),
+    sources: str = Form("linkedin"),
     linkedin_email: str = Form(""),
     linkedin_password: str = Form(""),
+    aca_username: str = Form(""),
+    aca_password: str = Form(""),
+    ampp_username: str = Form(""),
+    ampp_password: str = Form(""),
+    tenders_date_from: str = Form(""),
+    tenders_date_to: str = Form(""),
+    tenders_states: str = Form(""),
+    trade_show_events: str = Form(""),
+    trade_show_custom_url: str = Form(""),
 ):
     import threading
     from scraper.search_engine import run_scrape
 
     scraper_results.clear()
-    scraper_status.update({"running": True, "found": 0, "message": "Starting scrape..."})
+    source_list = [s.strip() for s in sources.split(",") if s.strip()]
+    scraper_status.update({"running": True, "sources": {}, "total_found": 0, "message": f"Starting scrape ({len(source_list)} sources)..."})
 
     keyword_list = [k.strip() for k in keywords.split(",") if k.strip()]
     if not keyword_list:
         keyword_list = settings.industry_keywords[:5]
 
-    # Credentials: form submission (from browser localStorage) > .env fallback
-    li_email = linkedin_email or settings.linkedin_email
-    li_password = linkedin_password or settings.linkedin_password
+    # Build credentials dict
+    credentials = {}
+    if linkedin_email:
+        credentials["linkedin"] = {"email": linkedin_email, "password": linkedin_password}
+    elif settings.linkedin_email:
+        credentials["linkedin"] = {"email": settings.linkedin_email, "password": settings.linkedin_password}
+    if aca_username:
+        credentials["aca"] = {"username": aca_username, "password": aca_password}
+    if ampp_username:
+        credentials["ampp"] = {"username": ampp_username, "password": ampp_password}
 
-    cred_source = "browser" if linkedin_email else (".env" if settings.linkedin_email else "none")
-    logger.info(f"WEB: Scrape requested — keywords={keyword_list}, location={location}, max={max_results}, creds={cred_source}")
+    # Build source configs
+    source_configs = {}
+    if tenders_date_from or tenders_date_to:
+        tender_config = {}
+        if tenders_date_from:
+            tender_config["date_from"] = tenders_date_from
+        if tenders_date_to:
+            tender_config["date_to"] = tenders_date_to
+        if tenders_states:
+            tender_config["states"] = [s.strip() for s in tenders_states.split(",") if s.strip()]
+        source_configs["tenders_au"] = tender_config
+        source_configs["tenders_nz"] = {"date_from": tender_config.get("date_from", ""), "date_to": tender_config.get("date_to", "")}
+    if trade_show_events or trade_show_custom_url:
+        ts_config = {}
+        if trade_show_events:
+            ts_config["events"] = [e.strip() for e in trade_show_events.split(",") if e.strip()]
+        if trade_show_custom_url:
+            ts_config["event_urls"] = [trade_show_custom_url.strip()]
+        source_configs["trade_shows"] = ts_config
+
+    logger.info(f"WEB: Multi-source scrape — sources={source_list}, keywords={keyword_list}, location={location}")
 
     def _scrape():
         try:
-            results = run_scrape(keyword_list, location, max_results, linkedin_email=li_email, linkedin_password=li_password)
-            scraper_results.extend(results)
-            scraper_status.update({"running": False, "found": len(results), "message": f"Complete. Found {len(results)} leads."})
+            results, status = run_scrape(source_list, keyword_list, location, max_results, credentials, source_configs)
+            with _scraper_lock:
+                scraper_results.extend(results)
+                scraper_status.update({"running": False, "sources": status.get("sources", {}), "total_found": len(results), "message": f"Complete. Found {len(results)} leads."})
             logger.info(f"WEB: Scrape finished — {len(results)} leads found")
         except Exception as e:
-            scraper_status.update({"running": False, "found": 0, "message": f"Error: {str(e)}"})
+            with _scraper_lock:
+                scraper_status.update({"running": False, "total_found": 0, "message": f"Error: {str(e)}"})
             logger.error(f"WEB: Scrape failed — {e}")
 
     thread = threading.Thread(target=_scrape, daemon=True)
@@ -640,6 +706,7 @@ def scraper_start(
         "request": request,
         "scraper_status": scraper_status,
         "results": scraper_results,
+        "get_source_badge_css": get_source_badge_css,
     })
 
 
@@ -649,6 +716,20 @@ def scraper_status_check(request: Request):
         "request": request,
         "scraper_status": scraper_status,
         "results": scraper_results,
+        "get_source_badge_css": get_source_badge_css,
+    })
+
+
+@app.post("/scraper/cancel", response_class=HTMLResponse)
+def scraper_cancel(request: Request):
+    from scraper.search_engine import cancel_scrape
+    cancel_scrape()
+    scraper_status.update({"running": False, "message": "Cancelled by user"})
+    return templates.TemplateResponse("partials/scraper_status.html", {
+        "request": request,
+        "scraper_status": scraper_status,
+        "results": scraper_results,
+        "get_source_badge_css": get_source_badge_css,
     })
 
 
@@ -666,10 +747,11 @@ def _add_scraper_result_to_db(index: int, db: Session) -> tuple[dict | None, str
     existing = None
     if result.get("linkedin_url"):
         existing = db.query(Contact).filter(Contact.linkedin_url == result["linkedin_url"]).first()
-    if not existing and result.get("first_name") and result.get("last_name"):
+    if not existing and result.get("first_name") and result.get("last_name") and result.get("company_name"):
         existing = db.query(Contact).filter(
             Contact.first_name == result["first_name"],
             Contact.last_name == result["last_name"],
+            Contact.company.has(Company.company_name == result["company_name"]),
         ).first()
 
     if existing:
@@ -682,9 +764,9 @@ def _add_scraper_result_to_db(index: int, db: Session) -> tuple[dict | None, str
         if not company:
             company = Company(
                 company_name=result.get("company_name", ""),
+                company_domain=result.get("company_domain"),
                 company_industry=result.get("company_industry", ""),
                 company_location=result.get("company_location", ""),
-                company_linkedin_url=result.get("company_linkedin_url"),
             )
             db.add(company)
             db.flush()
@@ -698,7 +780,8 @@ def _add_scraper_result_to_db(index: int, db: Session) -> tuple[dict | None, str
         location_state=result.get("location_state", ""),
         location_country=result.get("location_country", "AU"),
         lead_status="New",
-        lead_source="LinkedIn",
+        lead_source=result.get("source_name", "Unknown"),
+        source_url=result.get("source_url"),
         company_id=company.id if company else None,
     )
     db.add(contact)
@@ -726,6 +809,8 @@ def scraper_add_lead(request: Request, index: int, db: Session = Depends(get_db)
         "company": result.get("company_name", "-"),
         "location": loc,
         "status": status,
+        "source_name": result.get("source_name", "Unknown"),
+        "source_badge_css": get_source_badge_css(result.get("source_name", "")),
     })
 
 
@@ -748,9 +833,10 @@ def scraper_add_bulk(request: Request, indices: list[int] = Form(...), db: Sessi
 
     return templates.TemplateResponse("partials/scraper_status.html", {
         "request": request,
-        "scraper_status": {"running": False, "found": scraper_status.get("found", 0), "message": msg},
+        "scraper_status": {"running": False, "total_found": scraper_status.get("total_found", 0), "message": msg},
         "results": scraper_results,
         "added_indices": indices,
+        "get_source_badge_css": get_source_badge_css,
     })
 
 
