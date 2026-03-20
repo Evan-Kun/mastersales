@@ -1,0 +1,7 @@
+[    1917ms] Unexpected token '<'
+[    1920ms] [WARNING] Unrecognized feature: 'web-share'. @ https://ace.ampp.org/exhibitors:469
+[    1942ms] [ERROR] Framing 'https://player.vimeo.com/' violates the following report-only Content Security Policy directive: "frame-src 'self' https://www.google.com/recaptcha/ https://www.recaptcha.net/recaptcha/ https://api.connectedcommunity.org/ https://www.youtube.com/embed/". The violation has been logged, but no further action has been taken.
+ @ https://ace.ampp.org/exhibitors:469
+[    2343ms] [ERROR] Framing 'https://player.vimeo.com/' violates the following report-only Content Security Policy directive: "frame-src 'self' https://www.google.com/recaptcha/ https://www.recaptcha.net/recaptcha/ https://api.connectedcommunity.org/ https://www.youtube.com/embed/". The violation has been logged, but no further action has been taken.
+ @ https://ace.ampp.org/exhibitors:469
+[    2938ms] [WARNING] Initialization of sharing external failed: TypeError: Cannot set properties of null (setting 'onload') @ https://d3uf7shreuzboy.cloudfront.net/WebRoot/stable/ReactRoot/ReactRoot~runtime~main.bundle.0904aea0aa1a1b08e34e.hash.js:0

@@ -1,0 +1,19 @@
+[    2367ms] Unexpected token '<'
+[    2374ms] Invalid or unexpected token
+[    2375ms] Unexpected string
+[    2546ms] [WARNING] Initialization of sharing external failed: TypeError: Cannot set properties of null (setting 'onload') @ https://d3uf7shreuzboy.cloudfront.net/WebRoot/stable/ReactRoot/ReactRoot~runtime~main.bundle.0904aea0aa1a1b08e34e.hash.js:0
+[    3495ms] [ERROR] Framing 'https://10176109.fls.doubleclick.net/' violates the following report-only Content Security Policy directive: "frame-src 'self' https://www.google.com/recaptcha/ https://www.recaptcha.net/recaptcha/ https://api.connectedcommunity.org/ https://www.youtube.com/embed/". The violation has been logged, but no further action has been taken.
+ @ https://www.googletagmanager.com/:0
+[    4127ms] [ERROR] Framing 'https://10176109.fls.doubleclick.net/' violates the following report-only Content Security Policy directive: "frame-src 'self' https://www.google.com/recaptcha/ https://www.recaptcha.net/recaptcha/ https://api.connectedcommunity.org/ https://www.youtube.com/embed/". The violation has been logged, but no further action has been taken.
+ @ https://www.googletagmanager.com/:0
+[    4352ms] [ERROR] Framing 'https://10176109.fls.doubleclick.net/' violates the following report-only Content Security Policy directive: "frame-src 'self' https://www.google.com/recaptcha/ https://www.recaptcha.net/recaptcha/ https://api.connectedcommunity.org/ https://www.youtube.com/embed/". The violation has been logged, but no further action has been taken.
+ @ https://www.googletagmanager.com/:0
+[    4554ms] [ERROR] Framing 'https://ct.pinterest.com/' violates the following report-only Content Security Policy directive: "frame-src 'self' https://www.google.com/recaptcha/ https://www.recaptcha.net/recaptcha/ https://api.connectedcommunity.org/ https://www.youtube.com/embed/". The violation has been logged, but no further action has been taken.
+ @ https://s.pinimg.com/:0
+[    4700ms] [ERROR] Framing 'https://tags.crwdcntrl.net/' violates the following report-only Content Security Policy directive: "frame-src 'self' https://www.google.com/recaptcha/ https://www.recaptcha.net/recaptcha/ https://api.connectedcommunity.org/ https://www.youtube.com/embed/". The violation has been logged, but no further action has been taken.
+ @ https://tags.crwdcntrl.net/:0
+[    4721ms] [ERROR] Framing 'https://tags.crwdcntrl.net/' violates the following report-only Content Security Policy directive: "frame-src 'self' https://www.google.com/recaptcha/ https://www.recaptcha.net/recaptcha/ https://api.connectedcommunity.org/ https://www.youtube.com/embed/". The violation has been logged, but no further action has been taken.
+ @ https://tags.crwdcntrl.net/:0
+[    5455ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://aa.agkn.com/adscores/g.json?sid=9202507693:0
+[    7880ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ https://www.ampp.org/higherlogic/ocapi/oc/Metrics/Telemetry/SendTelemetry:0
+[   10815ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ https://www.ampp.org/higherlogic/ocapi/oc/Metrics/Telemetry/SendTelemetry:0
