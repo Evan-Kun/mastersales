@@ -5,32 +5,34 @@ from scraper.base import BaseScraper, ScraperConfig, ScraperResult
 logger = logging.getLogger("mastersales.scraper.trade_shows")
 
 HARDCODED_EVENTS = {
-    "aca_conf": {
-        "name": "Australasian Corrosion Conference",
+    "imarc": {
+        "name": "IMARC Mining Conference",
         "urls": [
-            "https://www.corrosion.com.au/events/australasian-corrosion-conference",
-            "https://www.corrosion.com.au/conference/exhibitors",
+            "https://imarcglobal.com/exhibitors",
+        ],
+    },
+    "aca_conf": {
+        "name": "ACA Corrosion & Prevention",
+        "urls": [
+            "https://corrosion-prevention2026.eventsair.site/exhibitors",
         ],
     },
     "austmine": {
-        "name": "Austmine Conference",
+        "name": "Austmine / GRX",
         "urls": [
-            "https://www.austmine.com.au/events",
-            "https://www.austmine.com.au/conference/exhibitors",
+            "https://www.grx.au/",
         ],
     },
     "ampp_annual": {
         "name": "AMPP Annual Conference",
         "urls": [
-            "https://www.ampp.org/events/annual-conference",
-            "https://www.ampp.org/events/annual-conference/exhibitors",
+            "https://ace.ampp.org/exhibitors",
         ],
     },
-    "steel_australia": {
-        "name": "Steel Australia Conference",
+    "aimex": {
+        "name": "AIMEX Mining Exhibition",
         "urls": [
-            "https://www.steel.org.au/events",
-            "https://www.steel.org.au/conference/exhibitors",
+            "https://www.aimex.com.au/",
         ],
     },
 }
