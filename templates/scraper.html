@@ -202,7 +202,7 @@
                 </div>
 
                 <!-- AU Tenders Panel -->
-                <div x-show="activeTab === 'au_tenders'" x-transition>
+                <div x-show="activeTab === 'tenders_au'" x-transition>
                     <h4 class="text-sm font-semibold text-gray-900 mb-3">Australian Tenders Configuration</h4>
                     <div class="border border-gray-200 rounded-lg p-4 space-y-4">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -239,7 +239,7 @@
                 </div>
 
                 <!-- NZ Tenders Panel -->
-                <div x-show="activeTab === 'nz_tenders'" x-transition>
+                <div x-show="activeTab === 'tenders_nz'" x-transition>
                     <h4 class="text-sm font-semibold text-gray-900 mb-3">New Zealand Tenders Configuration</h4>
                     <div class="border border-gray-200 rounded-lg p-4 space-y-4">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -388,8 +388,8 @@ function scraperApp() {
             { slug: 'linkedin', label: 'LinkedIn' },
             { slug: 'aca', label: 'ACA' },
             { slug: 'ampp', label: 'AMPP' },
-            { slug: 'au_tenders', label: 'AU Tenders' },
-            { slug: 'nz_tenders', label: 'NZ Tenders' },
+            { slug: 'tenders_au', label: 'AU Tenders' },
+            { slug: 'tenders_nz', label: 'NZ Tenders' },
             { slug: 'trade_shows', label: 'Trade Shows' },
         ],
         creds: {
@@ -489,9 +489,9 @@ function scraperApp() {
                     return this.creds.aca.username ? 'bg-green-400' : 'bg-gray-300';
                 case 'ampp':
                     return this.creds.ampp.username ? 'bg-green-400' : 'bg-gray-300';
-                case 'au_tenders':
+                case 'tenders_au':
                     return this.tenders.au.dateFrom ? 'bg-green-400' : 'bg-gray-300';
-                case 'nz_tenders':
+                case 'tenders_nz':
                     return this.tenders.nz.dateFrom ? 'bg-green-400' : 'bg-gray-300';
                 case 'trade_shows':
                     return this.selectedTradeShows.length > 0 || this.tradeShowCustomUrl ? 'bg-green-400' : 'bg-gray-300';
