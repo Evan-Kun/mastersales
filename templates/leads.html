@@ -56,7 +56,7 @@
     </div>
 </div>
 
-<!-- Delete Confirmation Modal (handles both single and bulk) -->
+<!-- Delete Confirmation Modal -->
 <div x-show="showDeleteConfirm" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0"
      x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150"
      x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
@@ -76,10 +76,10 @@
                 <h3 class="text-lg font-semibold text-gray-900" x-text="deleteTarget.name ? 'Delete lead' : 'Delete leads'"></h3>
                 <p class="text-sm text-gray-500">
                     <template x-if="deleteTarget.name">
-                        <span>Permanently remove <span class="font-semibold text-gray-700" x-text="deleteTarget.name"></span> and all related meetings, proposals, and nurture enrollments?</span>
+                        <span>Permanently remove <span class="font-semibold text-gray-700" x-text="deleteTarget.name"></span> and all related data?</span>
                     </template>
                     <template x-if="!deleteTarget.name">
-                        <span>Permanently remove <span class="font-semibold text-gray-700" x-text="deleteTarget.ids.length"></span> lead(s) and all related meetings, proposals, and nurture enrollments?</span>
+                        <span>Permanently remove <span class="font-semibold text-gray-700" x-text="deleteTarget.ids.length"></span> lead(s) and all related data?</span>
                     </template>
                 </p>
             </div>
@@ -89,7 +89,6 @@
                     class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors">
                 Cancel
             </button>
-            <!-- Single delete -->
             <form x-show="deleteTarget.ids.length === 1 && deleteTarget.name" method="POST"
                   :action="'/leads/' + deleteTarget.ids[0] + '/delete'">
                 <button type="submit"
@@ -97,7 +96,6 @@
                     Yes, delete
                 </button>
             </form>
-            <!-- Bulk delete -->
             <form x-show="!(deleteTarget.ids.length === 1 && deleteTarget.name)" method="POST" action="/leads/delete-selected">
                 <template x-for="id in deleteTarget.ids" :key="id">
                     <input type="hidden" name="ids" :value="id">
@@ -111,51 +109,91 @@
     </div>
 </div>
 
-<!-- Toolbar: Search, Filters, Actions -->
-<div class="bg-white rounded-xl shadow-sm p-4 mb-6 border border-gray-100">
-    <div class="flex flex-wrap gap-4 items-end">
-        <!-- Search + Filters (form) -->
-        <form class="flex flex-wrap gap-4 items-end flex-1 min-w-0" action="/leads" method="get">
-            <div class="flex-1 min-w-[180px]">
-                <label class="block text-xs font-medium text-gray-500 mb-1">Search</label>
-                <input type="text" name="q" value="{{ q }}" placeholder="Name, company, title, email..."
-                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy focus:border-navy"
-                       hx-get="/leads" hx-trigger="keyup changed delay:300ms" hx-target="#leads-table-body" hx-include="[name='status'],[name='state']">
+<!-- Toolbar: Search + Filters -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
+    <form class="p-4" action="/leads" method="get">
+        <!-- Row 1: Search bar (full width) -->
+        <div class="relative mb-3">
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+            <input type="text" name="q" value="{{ q }}" placeholder="Search by name, company, title, source..."
+                   class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-navy focus:border-navy bg-gray-50 focus:bg-white transition-colors"
+                   hx-get="/leads" hx-trigger="keyup changed delay:300ms" hx-target="#leads-table-body"
+                   hx-include="[name='status'],[name='state'],[name='source'],[name='country']">
+        </div>
+
+        <!-- Row 2: Filter dropdowns -->
+        <div class="flex flex-wrap gap-3 items-center">
+            <!-- Source filter -->
+            <div class="flex items-center gap-1.5">
+                <label class="text-xs font-medium text-gray-400 uppercase tracking-wider">Source</label>
+                <select name="source" class="pl-2 pr-7 py-1.5 border border-gray-200 rounded-lg text-sm bg-white hover:border-gray-300 focus:ring-2 focus:ring-navy focus:border-navy transition-colors cursor-pointer" onchange="this.form.submit()">
+                    <option value="">All</option>
+                    {% for s in sources %}
+                    <option value="{{ s }}" {% if current_source == s %}selected{% endif %}>{{ s }}</option>
+                    {% endfor %}
+                </select>
             </div>
-            <div>
-                <label class="block text-xs font-medium text-gray-500 mb-1">Status</label>
-                <select name="status" class="px-3 py-2 border border-gray-300 rounded-lg text-sm" onchange="this.form.submit()">
-                    <option value="">All Statuses</option>
+
+            <!-- Status filter -->
+            <div class="flex items-center gap-1.5">
+                <label class="text-xs font-medium text-gray-400 uppercase tracking-wider">Status</label>
+                <select name="status" class="pl-2 pr-7 py-1.5 border border-gray-200 rounded-lg text-sm bg-white hover:border-gray-300 focus:ring-2 focus:ring-navy focus:border-navy transition-colors cursor-pointer" onchange="this.form.submit()">
+                    <option value="">All</option>
                     {% for s in statuses %}
                     <option value="{{ s }}" {% if current_status == s %}selected{% endif %}>{{ s }}</option>
                     {% endfor %}
                 </select>
             </div>
-            <div>
-                <label class="block text-xs font-medium text-gray-500 mb-1">State</label>
-                <select name="state" class="px-3 py-2 border border-gray-300 rounded-lg text-sm" onchange="this.form.submit()">
-                    <option value="">All States</option>
+
+            <!-- State filter -->
+            <div class="flex items-center gap-1.5">
+                <label class="text-xs font-medium text-gray-400 uppercase tracking-wider">State</label>
+                <select name="state" class="pl-2 pr-7 py-1.5 border border-gray-200 rounded-lg text-sm bg-white hover:border-gray-300 focus:ring-2 focus:ring-navy focus:border-navy transition-colors cursor-pointer" onchange="this.form.submit()">
+                    <option value="">All</option>
                     {% for st in states %}
                     <option value="{{ st }}" {% if current_state == st %}selected{% endif %}>{{ st }}</option>
                     {% endfor %}
                 </select>
             </div>
-            <button type="submit" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200">Filter</button>
-        </form>
-        <!-- Actions (outside form, same row) -->
-        <div class="flex gap-2 border-l border-gray-200 pl-4">
-            <a href="/leads/trash" title="Trash"
-               class="px-3 py-2 bg-white text-gray-500 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 hover:text-gray-700 transition-colors flex items-center gap-1.5">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                Trash
+
+            <!-- Country filter -->
+            <div class="flex items-center gap-1.5">
+                <label class="text-xs font-medium text-gray-400 uppercase tracking-wider">Country</label>
+                <select name="country" class="pl-2 pr-7 py-1.5 border border-gray-200 rounded-lg text-sm bg-white hover:border-gray-300 focus:ring-2 focus:ring-navy focus:border-navy transition-colors cursor-pointer" onchange="this.form.submit()">
+                    <option value="">All</option>
+                    {% for c in countries %}
+                    <option value="{{ c }}" {% if current_country == c %}selected{% endif %}>{{ c }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Spacer -->
+            <div class="flex-1"></div>
+
+            <!-- Active filters indicator + clear -->
+            {% set active_filters = (current_status or current_state or current_source or current_country or q) %}
+            {% if active_filters %}
+            <a href="/leads" class="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 transition-colors">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                Clear filters
             </a>
-            <a href="/leads/export" title="Export all leads as CSV"
-               class="px-3 py-2 bg-white text-gray-500 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 hover:text-gray-700 transition-colors flex items-center gap-1.5">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                Export
-            </a>
+            {% endif %}
+
+            <!-- Actions -->
+            <div class="flex gap-1.5 border-l border-gray-200 pl-3">
+                <a href="/leads/trash" title="Trash"
+                   class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </a>
+                <a href="/leads/export{% if q %}?q={{ q }}{% endif %}" title="Export as CSV"
+                   class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                </a>
+            </div>
         </div>
-    </div>
+    </form>
 </div>
 
 <!-- Leads Table -->
@@ -183,7 +221,6 @@
             {% for contact in contacts %}
             <tr class="group transition-colors duration-100"
                 :class="selected.includes({{ contact.id }}) ? 'bg-blue-50/70 hover:bg-blue-100/50' : 'hover:bg-gray-50'">
-                <!-- Checkbox — larger click target -->
                 <td class="px-4 py-3" @click.stop>
                     <label class="flex items-center justify-center w-8 h-8 cursor-pointer">
                         <input type="checkbox" value="{{ contact.id }}"
@@ -191,14 +228,13 @@
                                class="rounded border-gray-300 text-navy focus:ring-navy cursor-pointer">
                     </label>
                 </td>
-                <!-- Data cells — click navigates -->
                 <td class="px-4 py-3 cursor-pointer" onclick="window.location='/leads/{{ contact.id }}'">
                     <div class="text-sm font-medium text-gray-900">{{ contact.first_name }} {{ contact.last_name or '' }}</div>
                     <div class="text-xs text-gray-400">{{ contact.seniority_level or '' }}</div>
                 </td>
                 <td class="px-4 py-3 text-sm text-gray-600 cursor-pointer" onclick="window.location='/leads/{{ contact.id }}'">{{ contact.company.company_name if contact.company else '-' }}</td>
                 <td class="px-4 py-3 text-sm text-gray-600 cursor-pointer max-w-[200px] truncate" onclick="window.location='/leads/{{ contact.id }}'">{{ contact.job_title or '-' }}</td>
-                <td class="px-4 py-3 text-sm text-gray-600 cursor-pointer" onclick="window.location='/leads/{{ contact.id }}'">{{ contact.location_city or '' }}{% if contact.location_state %}, {{ contact.location_state }}{% endif %}</td>
+                <td class="px-4 py-3 text-sm text-gray-600 cursor-pointer" onclick="window.location='/leads/{{ contact.id }}'">{{ contact.location_city or '' }}{% if contact.location_state %}, {{ contact.location_state }}{% endif %}{% if contact.location_country %} <span class="text-gray-400 text-xs">({{ contact.location_country }})</span>{% endif %}</td>
                 <td class="px-4 py-3 cursor-pointer" onclick="window.location='/leads/{{ contact.id }}'">
                     {% set badge_src = {"LinkedIn": "bg-sky-100 text-sky-700", "ACA": "bg-emerald-100 text-emerald-700", "AMPP": "bg-orange-100 text-orange-700", "AusTender": "bg-violet-100 text-violet-700", "GETS": "bg-indigo-100 text-indigo-700"} %}
                     {% set src = contact.lead_source or '' %}
@@ -216,7 +252,6 @@
                     {% set badge_colors = {"New": "bg-blue-100 text-blue-800", "Contacted": "bg-purple-100 text-purple-800", "Qualified": "bg-yellow-100 text-yellow-800", "Proposal": "bg-orange-100 text-orange-800", "Negotiation": "bg-pink-100 text-pink-800", "Won": "bg-green-100 text-green-800", "Lost": "bg-red-100 text-red-800"} %}
                     <span class="badge {{ badge_colors.get(contact.lead_status, 'bg-gray-100 text-gray-800') }}">{{ contact.lead_status }}</span>
                 </td>
-                <!-- Delete button — visible on hover, proper touch target -->
                 <td class="px-4 py-3 text-right" @click.stop>
                     <button @click="confirmDeleteSingle({{ contact.id }}, '{{ contact.first_name }} {{ contact.last_name or "" }}')"
                             title="Delete lead" aria-label="Delete {{ contact.first_name }}"

@@ -312,6 +312,8 @@ def leads_list(
     q: str = "",
     status: str = "",
     state: str = "",
+    source: str = "",
+    country: str = "",
     sort: str = "created_at",
     order: str = "desc",
 ):
@@ -324,6 +326,7 @@ def leads_list(
                 Contact.last_name.ilike(f"%{q}%"),
                 Contact.job_title.ilike(f"%{q}%"),
                 Contact.email_work.ilike(f"%{q}%"),
+                Contact.lead_source.ilike(f"%{q}%"),
                 Company.company_name.ilike(f"%{q}%"),
             )
         )
@@ -331,6 +334,10 @@ def leads_list(
         query = query.filter(Contact.lead_status == status)
     if state:
         query = query.filter(Contact.location_state == state)
+    if source:
+        query = query.filter(Contact.lead_source.ilike(f"%{source}%"))
+    if country:
+        query = query.filter(Contact.location_country == country)
 
     sort_col = getattr(Contact, sort, Contact.created_at)
     if order == "asc":
@@ -340,8 +347,11 @@ def leads_list(
 
     contacts = query.all()
 
+    all_contacts = _active_contacts(db).all()
     statuses = ["New", "Contacted", "Qualified", "Proposal", "Negotiation", "Won", "Lost"]
-    states = sorted(set(c.location_state for c in _active_contacts(db).all() if c.location_state))
+    states = sorted(set(c.location_state for c in all_contacts if c.location_state))
+    sources = sorted(set(c.lead_source for c in all_contacts if c.lead_source))
+    countries = sorted(set(c.location_country for c in all_contacts if c.location_country))
 
     if request.headers.get("HX-Request"):
         return templates.TemplateResponse("partials/leads_table_body.html", {
@@ -356,9 +366,13 @@ def leads_list(
         "contacts": contacts,
         "statuses": statuses,
         "states": states,
+        "sources": sources,
+        "countries": countries,
         "q": q,
         "current_status": status,
         "current_state": state,
+        "current_source": source,
+        "current_country": country,
         "sort": sort,
         "order": order,
     })
