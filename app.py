@@ -674,7 +674,9 @@ def scraper_start(
 
     scraper_results.clear()
     source_list = [s.strip() for s in sources.split(",") if s.strip()]
-    scraper_status.update({"running": True, "sources": {}, "total_found": 0, "message": f"Starting scrape ({len(source_list)} sources)..."})
+    # Pre-populate all sources as "waiting" so progress bar shows immediately
+    initial_sources = {slug: {"status": "waiting", "found": 0} for slug in source_list}
+    scraper_status.update({"running": True, "sources": initial_sources, "total_found": 0, "message": f"Starting scrape ({len(source_list)} sources)..."})
 
     keyword_list = [k.strip() for k in keywords.split(",") if k.strip()]
     if not keyword_list:
