@@ -194,8 +194,13 @@ def run_scrape(
     max_results: int = 20,
     credentials: dict | None = None,
     source_configs: dict | None = None,
+    live_status: dict | None = None,
 ) -> tuple[list[ScraperResult], dict]:
     """Run scrape across multiple sources in parallel.
+
+    Args:
+        live_status: If provided, this dict is updated in real-time so the
+                     web UI can poll progress. If None, an internal dict is used.
 
     Returns (deduped_results, status_dict).
     """
@@ -203,7 +208,7 @@ def run_scrape(
     source_configs = source_configs or {}
     _cancel_event.clear()
 
-    status: dict = {
+    status: dict = live_status if live_status is not None else {
         "running": True,
         "sources": {},
         "total_found": 0,

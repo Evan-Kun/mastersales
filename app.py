@@ -717,10 +717,14 @@ def scraper_start(
 
     def _scrape():
         try:
-            results, status = run_scrape(source_list, keyword_list, location, max_results, credentials, source_configs)
+            # Pass scraper_status as live_status so it gets updated in real-time
+            results, status = run_scrape(
+                source_list, keyword_list, location, max_results,
+                credentials, source_configs, live_status=scraper_status,
+            )
             with _scraper_lock:
                 scraper_results.extend(results)
-                scraper_status.update({"running": False, "sources": status.get("sources", {}), "total_found": len(results), "message": f"Complete. Found {len(results)} leads."})
+                scraper_status.update({"running": False, "total_found": len(results), "message": f"Complete. Found {len(results)} leads."})
             logger.info(f"WEB: Scrape finished — {len(results)} leads found")
         except Exception as e:
             with _scraper_lock:
