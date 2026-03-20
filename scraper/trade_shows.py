@@ -184,16 +184,5 @@ class TradeShowScraper(BaseScraper):
         return results
 
     def generate_demo_results(self, config: ScraperConfig) -> list[ScraperResult]:
-        from scraper.search_engine import generate_demo_data
-        titles = [
-            "Exhibitor Representative", "Sales Director", "Business Development Manager",
-            "Technical Sales Engineer", "Regional Manager", "Marketing Director",
-            "Booth Coordinator", "Product Specialist", "Account Manager",
-        ]
-        return generate_demo_data(
-            keywords=config.get("keywords", []),
-            max_results=config.get("max_results", 20),
-            source_name="Trade Show: Demo Event",
-            job_titles=titles,
-            source_url_base="https://tradeshow.example.com",
-        )
+        """Required by ABC but never called — returns empty list."""
+        return []

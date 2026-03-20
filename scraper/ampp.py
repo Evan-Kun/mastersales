@@ -279,18 +279,5 @@ class AMPPScraper(BaseScraper):
             return False
 
     def generate_demo_results(self, config: ScraperConfig) -> list[ScraperResult]:
-        from scraper.search_engine import generate_demo_data
-        titles = [
-            "AMPP Certified Inspector", "Protective Coatings Specialist",
-            "NACE Level III Inspector", "Cathodic Protection Technician",
-            "Coatings Application Supervisor", "Materials Engineer",
-            "Pipeline Integrity Specialist", "Corrosion Technologist",
-            "AMPP Chapter Chair - Australia",
-        ]
-        return generate_demo_data(
-            keywords=config.get("keywords", []),
-            max_results=config.get("max_results", 20),
-            source_name="AMPP",
-            job_titles=titles,
-            source_url_base="https://ampp.org",
-        )
+        """Required by ABC but never called — returns empty list."""
+        return []

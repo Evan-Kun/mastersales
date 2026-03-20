@@ -214,30 +214,5 @@ class GETSScraper(BaseScraper):
                 continue
 
     def generate_demo_results(self, config: ScraperConfig) -> list[ScraperResult]:
-        from scraper.search_engine import generate_demo_data
-
-        NZ_COMPANIES = [
-            ("Pacific Dockyard NZ", "Wellington", None, "NZ"),
-            ("Kiwi Steel Structures", "Auckland", None, "NZ"),
-            ("Tasman Steel NZ", "Christchurch", None, "NZ"),
-            ("NZ Steel", "Glenbrook", None, "NZ"),
-            ("Fletcher Steel NZ", "Hamilton", None, "NZ"),
-            ("Steel & Tube NZ", "Lower Hutt", None, "NZ"),
-        ]
-        titles = [
-            "Procurement Officer", "Contract Manager", "Tender Coordinator",
-            "Senior Buyer", "Supply Chain Manager", "Project Director",
-        ]
-
-        # Use generate_demo_data but override location to NZ
-        results = generate_demo_data(
-            keywords=config.get("keywords", []),
-            max_results=config.get("max_results", 20),
-            source_name="GETS",
-            job_titles=titles,
-            source_url_base="https://gets.govt.nz",
-        )
-        # Override all locations to NZ
-        for r in results:
-            r["location_country"] = "NZ"
-        return results
+        """Required by ABC but never called — returns empty list."""
+        return []

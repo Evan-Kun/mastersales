@@ -394,16 +394,5 @@ class AusTenderScraper(BaseScraper):
         return results
 
     def generate_demo_results(self, config: ScraperConfig) -> list[ScraperResult]:
-        from scraper.search_engine import generate_demo_data
-        titles = [
-            "Contract Officer", "Procurement Manager", "Tender Coordinator",
-            "Contracts Administrator", "Project Director", "Supply Chain Manager",
-            "Infrastructure Procurement Lead", "Senior Buyer", "Vendor Manager",
-        ]
-        return generate_demo_data(
-            keywords=config.get("keywords", []),
-            max_results=config.get("max_results", 20),
-            source_name="AusTender",
-            job_titles=titles,
-            source_url_base="https://tenders.gov.au",
-        )
+        """Required by ABC but never called — returns empty list."""
+        return []

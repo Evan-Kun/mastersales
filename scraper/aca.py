@@ -259,16 +259,5 @@ class ACAScraper(BaseScraper):
         return results[:max_results]
 
     def generate_demo_results(self, config: ScraperConfig) -> list[ScraperResult]:
-        from scraper.search_engine import generate_demo_data
-        titles = [
-            "Corrosion Scientist", "ACA Committee Member", "Cathodic Protection Engineer",
-            "Corrosion Inspector", "Materials Scientist", "Coatings Specialist",
-            "Research Fellow - Corrosion", "Technical Director", "ACA Branch Chair",
-        ]
-        return generate_demo_data(
-            keywords=config.get("keywords", []),
-            max_results=config.get("max_results", 20),
-            source_name="ACA",
-            job_titles=titles,
-            source_url_base="https://corrosion.com.au",
-        )
+        """Required by ABC but never called — returns empty list."""
+        return []

@@ -938,20 +938,5 @@ class LinkedInScraper(BaseScraper):
         ]
 
     def generate_demo_results(self, config: ScraperConfig) -> list[ScraperResult]:
-        from scraper.search_engine import generate_demo_data
-        titles = [
-            "Steel Fabrication Manager", "Corrosion Engineer", "Maintenance Director",
-            "Procurement Specialist", "Quality Control Manager", "Site Engineer",
-            "Materials Engineer", "Plant Manager", "Operations Manager",
-        ]
-        results = generate_demo_data(
-            keywords=config.get("keywords", []),
-            max_results=config.get("max_results", 20),
-            source_name="LinkedIn",
-            job_titles=titles,
-            source_url_base="https://linkedin.com/in",
-        )
-        for r in results:
-            slug = f"{r['first_name'].lower()}-{r['last_name'].lower()}-demo"
-            r["linkedin_url"] = f"https://linkedin.com/in/{slug}"
-        return results
+        """Required by ABC but never called — returns empty list."""
+        return []
