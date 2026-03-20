@@ -33,6 +33,17 @@
 <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
     <p class="text-sm font-medium text-amber-800">{{ scraper_status.message }}</p>
 </div>
+{% elif scraper_status.get('message', 'Idle') != 'Idle' %}
+<div class="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-6">
+    <p class="text-sm font-medium text-gray-700">{{ scraper_status.message }}</p>
+    {% if scraper_status.get('sources') %}
+    <div class="flex flex-wrap gap-2 mt-2">
+        {% for slug, src_status in scraper_status.get('sources', {}).items() %}
+        <span class="text-xs text-gray-500">{{ slug }}: {{ src_status.get('found', 0) }} found</span>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
 {% endif %}
 
 {% if results %}
